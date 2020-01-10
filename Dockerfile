@@ -14,6 +14,7 @@ RUN yarn build
 
 ENV NODE_ENV production
 ENV PORT 9005
+ENV SMTP_PORT 2500
 ENV SQLITE_DB /tmp/mailthing.db
 EXPOSE 9005
 EXPOSE 2500

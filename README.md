@@ -31,7 +31,8 @@ $ yarn dev
 
 Uses the following Environment Variables
 
-- PORT (default: 9005)
+- PORT (default: 9005) - the ui webserver listens to this port
+- SMTP_PORT (default: 2500) - the smtp server runs on this port
 - SQLITE_DB (default: ':memory:') - set to a filesystem path to persist messages to disk
 
 Set your application to use mailthing's SMTP server. The default port is 2500. It will accept any authentication.

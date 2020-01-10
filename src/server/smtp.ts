@@ -2,6 +2,8 @@ import { SMTPServer } from "smtp-server";
 import { simpleParser } from "mailparser";
 import { MessageStore } from "server/types";
 
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "2500", 10);
+
 export class SmtpServer {
   server: SMTPServer;
   messageStore: MessageStore;
@@ -34,6 +36,6 @@ export class SmtpServer {
   }
 
   start() {
-    this.server.listen(2500);
+    this.server.listen(SMTP_PORT);
   }
 }
