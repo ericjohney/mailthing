@@ -1,6 +1,5 @@
-import { RuntimeConfig } from "next/config";
 import { createConnection, Connection } from "typeorm";
-import { MessageStore } from "./types";
+import { MessageStore, RuntimeConfig } from "./types";
 import { Message } from "shared/Message";
 
 export class SqliteStore implements MessageStore {

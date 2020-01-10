@@ -1,5 +1,12 @@
 import { Message } from "shared/Message";
 
+export interface RuntimeConfig {
+  serverRuntimeConfig: {
+    sqliteDatabase: string;
+    emailOverride: string;
+  };
+}
+
 export interface MessageStore {
   connect: (options: Object) => Promise<any>;
   disconnect: (options: Object) => Promise<any>;

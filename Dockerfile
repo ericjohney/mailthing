@@ -1,4 +1,4 @@
-FROM node:10-alpine
+FROM node:12-alpine
 
 RUN mkdir -p /opt/app
 
@@ -6,6 +6,7 @@ WORKDIR /opt/app
 
 # copy dependencies first so these can get cached separately
 COPY package.json /opt/app
+COPY yarn.lock /opt/app
 RUN yarn install
 
 COPY . /opt/app

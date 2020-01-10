@@ -1,11 +1,10 @@
-import * as express from "express";
-import * as next from "next";
-import { MessageStore } from "./types";
+import express from "express";
+import next from "next";
+import { MessageStore, RuntimeConfig } from "./types";
 import { apiRoutes } from "server/api";
-import { RuntimeConfig } from "next/config";
 
 const dev = process.env.NODE_ENV !== "production";
-const PORT = process.env.PORT || 9005;
+const PORT = parseInt(process.env.PORT || "9005", 10);
 const app = next({ dev });
 const handle = app.getRequestHandler();
 

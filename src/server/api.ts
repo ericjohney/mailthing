@@ -1,8 +1,7 @@
 import * as express from "express";
 import * as bodyParser from "body-parser";
 import * as nodemailer from "nodemailer";
-import { MessageStore } from "server/types";
-import { RuntimeConfig } from "next/config";
+import { MessageStore, RuntimeConfig } from "server/types";
 
 export function apiRoutes(
   { serverRuntimeConfig }: RuntimeConfig,
