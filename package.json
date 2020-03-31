@@ -16,7 +16,7 @@
     "express": "^4.17.1",
     "luxon": "^1.21.3",
     "mailparser": "^2.7.7",
-    "next": "9.1.6",
+    "next": "9.3.2",
     "nodemailer": "^6.4.2",
     "react": "16.12.0",
     "react-dom": "16.12.0",
