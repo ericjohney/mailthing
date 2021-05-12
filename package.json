@@ -17,7 +17,7 @@
     "luxon": "^1.21.3",
     "mailparser": "^2.7.7",
     "next": "9.1.6",
-    "nodemailer": "^6.4.2",
+    "nodemailer": "^6.4.16",
     "react": "16.12.0",
     "react-dom": "16.12.0",
     "smtp-server": "^3.5.0",
