@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mailthing
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/name: mailthing
+  app.kubernetes.io/part-of: mailthing
+
+images:
+  - name: ghcr.io/ericjohney/mailthing
+    newTag: latest

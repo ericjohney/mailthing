@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailthing
+  namespace: mailthing
+  labels:
+    app.kubernetes.io/name: mailthing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mailthing
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mailthing
+    spec:
+      containers:
+        - name: mailthing
+          image: ghcr.io/ericjohney/mailthing:latest
+          ports:
+            - name: http
+              containerPort: 9005
+              protocol: TCP
+            - name: smtp
+              containerPort: 2500
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "9005"
+            - name: SMTP_PORT
+              value: "2500"
+            - name: SQLITE_DB
+              value: "/data/mailthing.db"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mailthing-data
