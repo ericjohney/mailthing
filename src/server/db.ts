@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { Database } from "bun:sqlite";
 import type { ParsedMail } from "mailparser";
 import type { Message, MessageSummary } from "../shared/types";
 
@@ -21,7 +21,7 @@ export function addMessage(raw: Buffer, parsed: ParsedMail): number {
     "INSERT INTO messages (raw, parsed) VALUES (?, ?)"
   );
   const result = stmt.run(raw.toString("base64"), JSON.stringify(parsed));
-  return result.lastInsertRowid as number;
+  return Number(result.lastInsertRowid);
 }
 
 export function getMessages(): MessageSummary[] {
