@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailthing
+  namespace: mailthing
+  labels:
+    app.kubernetes.io/name: mailthing
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: smtp
+      port: 2500
+      targetPort: smtp
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: mailthing

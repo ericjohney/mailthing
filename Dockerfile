@@ -1,22 +1,41 @@
-FROM node:12-alpine
+# Build stage
+FROM oven/bun:1 AS builder
 
-RUN mkdir -p /opt/app
+WORKDIR /app
 
-WORKDIR /opt/app
+# Copy package files
+COPY package.json ./
+RUN bun install --frozen-lockfile --production=false
 
-# copy dependencies first so these can get cached separately
-COPY package.json /opt/app
-COPY yarn.lock /opt/app
-RUN yarn install
+# Copy source
+COPY . .
 
-COPY . /opt/app
-RUN yarn build
+# Build frontend
+RUN bun run build
 
-ENV NODE_ENV production
-ENV PORT 9005
-ENV SMTP_PORT 2500
-ENV SQLITE_DB /tmp/mailthing.db
-EXPOSE 9005
-EXPOSE 2500
+# Production stage
+FROM oven/bun:1-slim
 
-CMD [ "npm", "start" ]
+WORKDIR /app
+
+# Copy package files and install production deps only
+COPY package.json ./
+RUN bun install --frozen-lockfile --production
+
+# Copy built assets and server code
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src ./src
+
+# Expose ports
+EXPOSE 9005 2500
+
+# Environment defaults
+ENV PORT=9005
+ENV SMTP_PORT=2500
+ENV SQLITE_DB=/data/mailthing.db
+
+# Create data directory
+RUN mkdir -p /data
+
+# Start server
+CMD ["bun", "run", "src/index.ts"]

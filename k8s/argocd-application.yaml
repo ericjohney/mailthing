@@ -1,0 +1,24 @@
+# Add this to your ericjohney/argocd repository
+# This tells ArgoCD to deploy mailthing from the k8s/ directory
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mailthing
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ericjohney/mailthing.git
+    targetRevision: main
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mailthing
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

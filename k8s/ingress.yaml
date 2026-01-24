@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mailthing
+  namespace: mailthing
+  labels:
+    app.kubernetes.io/name: mailthing
+  annotations:
+    # Adjust these based on your ingress controller
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx  # Change if using different ingress controller
+  rules:
+    - host: mailthing.example.com  # Change to your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mailthing
+                port:
+                  name: http
