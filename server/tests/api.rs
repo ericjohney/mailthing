@@ -428,3 +428,79 @@ async fn snoozed_mail_hides_then_returns_and_invalid_filters_are_rejected() {
         StatusCode::OK
     );
 }
+
+#[tokio::test]
+async fn imports_keep_original_time_mailbox_state_and_labels() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let (_temp, state) = setup().await;
+    let app = api::router(state.clone());
+    let current = deliver(&state, mail("Trip plans", "current", "This week")).await;
+    let original = 1_700_000_000_000_i64;
+    let (status, _) = request(
+        &app,
+        "POST",
+        "/api/import",
+        json!({"raw":STANDARD.encode(mail("Trip plans","old","Last year")),"received_at":original,"system_labels":["STARRED"],"labels":["Travel"," Receipts "]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = request(
+        &app,
+        "POST",
+        "/api/import",
+        json!({"raw":STANDARD.encode(mail("Receipt","receipt","Paid")),"system_labels":["INBOX","UNREAD"],"labels":["receipts"]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    while mailthing::pipeline::process_next(&state.pool, state.pipeline.clone())
+        .await
+        .unwrap()
+    {}
+    let old: (String, i64, String) = sqlx::query_as("SELECT thread_id,received_at,(SELECT group_concat(l.name,',') FROM (SELECT l.name FROM message_labels ml JOIN labels l ON l.id=ml.label_id WHERE ml.message_id=messages.id ORDER BY l.name) l) FROM messages WHERE message_id='<old@example.net>'")
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    assert_ne!(old.0, current);
+    assert_eq!(old.1, original);
+    // Archived and read; the heuristic category is kept.
+    assert_eq!(old.2, "Primary,Receipts,Starred,Travel");
+    let (_, labels) = request(&app, "GET", "/api/labels", json!(null)).await;
+    let user: Vec<&str> = labels
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|l| l["kind"] == "user")
+        .map(|l| l["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(user, ["Receipts", "Travel"]);
+    let receipts = labels
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["name"] == "Receipts")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let (_, found) = request(
+        &app,
+        "GET",
+        &format!("/api/threads?label={receipts}"),
+        json!(null),
+    )
+    .await;
+    assert_eq!(found["total"], 2);
+    let (_, inbox) = request(&app, "GET", "/api/threads?label=INBOX", json!(null)).await;
+    assert_eq!(inbox["total"], 2);
+    for bad in [
+        json!({"raw":STANDARD.encode(mail("x","x","x")),"system_labels":["SNOOZED"]}),
+        json!({"raw":STANDARD.encode(mail("x","x","x")),"received_at":0}),
+        json!({"raw":STANDARD.encode(mail("x","x","x")),"labels":[""]}),
+        json!({"raw":STANDARD.encode(mail("x","x","x")),"labels":["Inbox"]}),
+    ] {
+        assert_eq!(
+            request(&app, "POST", "/api/import", bad).await.0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+}

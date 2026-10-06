@@ -1,6 +1,9 @@
 use crate::{
     AppState, db, labels,
-    models::{Account, AttachmentView, Draft, Envelope, Label, MessageView, Rule, ThreadSummary},
+    models::{
+        Account, AttachmentView, Draft, Envelope, ImportState, Label, MessageView, Rule,
+        ThreadSummary,
+    },
     outgoing, search,
 };
 use axum::{
@@ -594,6 +597,13 @@ struct Import {
     raw: String,
     #[serde(default)]
     envelope: Envelope,
+    /// Original receipt time in Unix milliseconds.
+    received_at: Option<i64>,
+    /// State label ids such as INBOX and UNREAD; replaces the defaults for new mail.
+    system_labels: Option<Vec<String>>,
+    /// User label names; missing labels are created.
+    #[serde(default)]
+    labels: Vec<String>,
 }
 async fn import(
     State(state): State<AppState>,
@@ -605,7 +615,47 @@ async fn import(
     if raw.is_empty() || raw.len() > state.config.max_message_bytes {
         return Err(ApiError::bad("Email is empty or exceeds size limit"));
     }
-    let id = db::enqueue(&state.pool, raw, &input.envelope).await?;
+    if input
+        .received_at
+        .is_some_and(|t| t <= 0 || t > db::now() + 86_400_000)
+    {
+        return Err(ApiError::bad("Original receipt time is out of range"));
+    }
+    if let Some(system) = &input.system_labels
+        && system.iter().any(|l| !labels::STATE.contains(&l.as_str()))
+    {
+        return Err(ApiError::bad(format!(
+            "System labels must be among {}",
+            labels::STATE.join(", ")
+        )));
+    }
+    let names: Vec<&str> = input.labels.iter().map(|n| n.trim()).collect();
+    if names.len() > 50 || names.iter().any(|n| n.is_empty() || n.len() > 50) {
+        return Err(ApiError::bad("Label names must be 1 to 50 characters"));
+    }
+    let mut label_ids = Vec::new();
+    for name in names {
+        sqlx::query("INSERT OR IGNORE INTO labels(id,name,kind) VALUES(?,?,'user')")
+            .bind(uuid::Uuid::new_v4().to_string())
+            .bind(name)
+            .execute(&state.pool)
+            .await?;
+        // Names are unique case-insensitively, so a system label name finds no user label.
+        let id: Option<String> =
+            sqlx::query_scalar("SELECT id FROM labels WHERE name=? AND kind='user'")
+                .bind(name)
+                .fetch_optional(&state.pool)
+                .await?;
+        label_ids.push(id.ok_or_else(|| {
+            ApiError::bad(format!("\"{name}\" is a system label; use system_labels"))
+        })?);
+    }
+    let import_state = ImportState {
+        received_at: input.received_at,
+        system_labels: input.system_labels,
+        label_ids,
+    };
+    let id = db::enqueue_import(&state.pool, raw, &input.envelope, Some(&import_state)).await?;
     state.wake.notify_waiters();
     Ok(Json(json!({"id":id})))
 }

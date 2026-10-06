@@ -15,6 +15,9 @@ pub const CATEGORY_PERSONAL: &str = "CATEGORY_PERSONAL";
 pub const CATEGORY_PROMOTIONS: &str = "CATEGORY_PROMOTIONS";
 pub const CATEGORY_SOCIAL: &str = "CATEGORY_SOCIAL";
 pub const CATEGORY_UPDATES: &str = "CATEGORY_UPDATES";
+/// Labels describing where a message sits and how it was handled, as opposed to its
+/// category or the owner's own labels. An import may set these directly.
+pub const STATE: [&str; 7] = [INBOX, SENT, SPAM, TRASH, UNREAD, STARRED, IMPORTANT];
 pub const CATEGORIES: [&str; 4] = [
     CATEGORY_PERSONAL,
     CATEGORY_PROMOTIONS,

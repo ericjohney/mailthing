@@ -6,6 +6,19 @@ pub struct Envelope {
     pub to: Vec<String>,
 }
 
+/// Mailbox state carried by an imported message, such as one copied from Gmail.
+/// Unset fields keep what the pipeline assigns to newly received mail.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ImportState {
+    /// Original receipt time in Unix milliseconds; orders and threads the message.
+    pub received_at: Option<i64>,
+    /// When set, replaces the mailbox state labels (INBOX, UNREAD, STARRED, ...).
+    pub system_labels: Option<Vec<String>>,
+    /// User label ids added alongside any filter labels.
+    #[serde(default)]
+    pub label_ids: Vec<String>,
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Account {
     pub name: String,
