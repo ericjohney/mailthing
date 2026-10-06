@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, Plus, ShieldCheck } from 'lucide-react';
 import { Avatar, Button, IconButton, NavItem } from '../design-system';
 import type { Route, Settings } from '../types';
-import { folders } from './navigation';
+import { mailboxViews, userLabels } from './navigation';
 
 export function MailboxSidebar({
   settings,
@@ -22,6 +22,7 @@ export function MailboxSidebar({
   onSettings: (tab: string) => void;
 }) {
   const [showMore, setShowMore] = useState(false);
+  const labels = userLabels(settings.labels);
   return (
     <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
       <Button className="compose-button" aria-label="Compose" title="Compose" onClick={onCompose}>
@@ -30,20 +31,20 @@ export function MailboxSidebar({
       </Button>
       <span className="sidebar-section-name">Mailbox</span>
       <nav aria-label="Mailbox folders">
-        {folders.slice(0, showMore ? folders.length : 5).map((folder) => (
+        {mailboxViews.slice(0, showMore ? mailboxViews.length : 5).map((view) => (
           <NavItem
-            key={folder.id}
-            label={folder.name}
-            icon={<folder.icon size={18} />}
-            active={route.folder === folder.id && !searching}
+            key={view.id}
+            label={view.name}
+            icon={<view.icon size={18} />}
+            active={route.label === view.id && !searching}
             count={
-              folder.id === 'inbox' || folder.id === 'spam'
-                ? settings.counts[folder.id]?.unread
-                : folder.id === 'drafts'
-                  ? settings.counts.drafts?.total
+              view.id === 'INBOX' || view.id === 'SPAM'
+                ? settings.counts[view.id]?.unread
+                : view.id === 'DRAFTS'
+                  ? settings.counts.DRAFTS?.total
                   : undefined
             }
-            onClick={() => onNavigate({ folder: folder.id })}
+            onClick={() => onNavigate({ label: view.id })}
           />
         ))}
         <NavItem
@@ -60,17 +61,18 @@ export function MailboxSidebar({
         </IconButton>
       </div>
       <nav aria-label="Labels">
-        {settings.labels.map((label) => (
+        {labels.map((label) => (
           <NavItem
             key={label.id}
             label={label.name}
             title={label.name}
             icon={<span className="label-dot" style={{ background: label.color }} />}
             active={route.label === label.id && !searching}
-            onClick={() => onNavigate({ folder: 'label', label: label.id })}
+            count={settings.counts[label.id]?.unread}
+            onClick={() => onNavigate({ label: label.id })}
           />
         ))}
-        {!settings.labels.length && (
+        {!labels.length && (
           <button className="add-label-hint" onClick={() => onSettings('labels')}>
             Create your first label <Plus size={12} />
           </button>

@@ -238,7 +238,7 @@ async fn outbound_relay_sends_attachments_and_bcc_without_exposing_bcc_header() 
         .unwrap();
     assert!(envelope.contains("hidden@example.net"));
     assert_eq!(
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM messages WHERE folder='sent'")
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM messages m JOIN message_labels ml ON ml.message_id=m.id AND ml.label_id='SENT'")
             .fetch_one(&sender.pool)
             .await
             .unwrap(),

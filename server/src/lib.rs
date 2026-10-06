@@ -1,6 +1,7 @@
 pub mod api;
 pub mod config;
 pub mod db;
+pub mod labels;
 pub mod models;
 pub mod outgoing;
 pub mod pipeline;
@@ -35,6 +36,32 @@ impl AppState {
     }
 
     pub fn start_workers(&self, stop: watch::Receiver<bool>) -> Vec<tokio::task::JoinHandle<()>> {
+        let mut tasks = vec![self.start_snooze_waker(stop.clone())];
+        tasks.extend(self.start_queue_workers(stop));
+        tasks
+    }
+
+    /// Snoozed conversations return to the inbox by regaining INBOX when they are due.
+    fn start_snooze_waker(&self, mut stop: watch::Receiver<bool>) -> tokio::task::JoinHandle<()> {
+        let state = self.clone();
+        tokio::spawn(async move {
+            loop {
+                match db::wake_snoozed(&state.pool).await {
+                    Ok(0) => {}
+                    Ok(_) => {
+                        let _ = state.events.send(());
+                    }
+                    Err(error) => tracing::error!(%error, "Snooze wake-up failed"),
+                }
+                tokio::select! {
+                    _ = stop.changed() => break,
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(30)) => {},
+                }
+            }
+        })
+    }
+
+    fn start_queue_workers(&self, stop: watch::Receiver<bool>) -> Vec<tokio::task::JoinHandle<()>> {
         (0..self.config.concurrency)
             .map(|_| {
                 let state = self.clone();

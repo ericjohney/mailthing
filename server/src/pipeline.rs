@@ -1,7 +1,7 @@
 //! Add or reorder stages in Pipeline::default to change incoming mail processing.
 //! Stages are pure, synchronous transformations executed on Tokio's blocking pool.
 use crate::{
-    db,
+    db, labels,
     models::{Envelope, Rule},
 };
 use anyhow::{Context, Result};
@@ -24,14 +24,35 @@ pub struct ProcessedMail {
     pub text: String,
     pub html: String,
     pub snippet: String,
-    pub folder: String,
-    pub category: String,
-    pub starred: bool,
-    pub important: bool,
-    pub is_read: bool,
+    /// System and user label ids; together they describe where the message appears.
     pub labels: Vec<String>,
     pub attachments: Vec<Attachment>,
     pub headers: Vec<(String, String)>,
+}
+
+impl ProcessedMail {
+    pub fn add_label(&mut self, label: &str) {
+        if !self.has_label(label) {
+            self.labels.push(label.into());
+        }
+    }
+    pub fn remove_label(&mut self, label: &str) {
+        self.labels.retain(|l| l != label);
+    }
+    pub fn has_label(&self, label: &str) -> bool {
+        self.labels.iter().any(|l| l == label)
+    }
+    pub fn category(&self) -> Option<&str> {
+        self.labels
+            .iter()
+            .map(String::as_str)
+            .find(|l| labels::CATEGORIES.contains(l))
+    }
+    pub fn set_category(&mut self, category: &str) {
+        self.labels
+            .retain(|l| !labels::CATEGORIES.contains(&l.as_str()));
+        self.add_label(category);
+    }
 }
 
 #[derive(Debug)]
@@ -131,8 +152,8 @@ impl Stage for ParseStage {
             .iter()
             .map(|h| (h.get_key().to_lowercase(), h.get_value()))
             .collect();
-        mail.folder = "inbox".into();
-        mail.category = "primary".into();
+        mail.add_label(labels::INBOX);
+        mail.add_label(labels::UNREAD);
         collect_parts(&parsed, mail)?;
         let mut participants = vec![mail.sender_email.to_lowercase()];
         for value in [&mail.recipients, &mail.cc] {
@@ -250,18 +271,18 @@ impl Stage for CategorizeStage {
                 .map(|(_, value)| value.to_lowercase())
                 .unwrap_or_default()
         };
-        mail.category = if ["facebook", "linkedin", "instagram", "twitter", "discord"]
+        let category = if ["facebook", "linkedin", "instagram", "twitter", "discord"]
             .iter()
             .any(|s| sender.contains(s))
         {
-            "social"
+            labels::CATEGORY_SOCIAL
         } else if !header("list-unsubscribe").is_empty()
             || !header("list-id").is_empty()
             || ["newsletter", "sale", "discount", "offer"]
                 .iter()
                 .any(|s| subject.contains(s))
         {
-            "promotions"
+            labels::CATEGORY_PROMOTIONS
         } else if [
             "receipt",
             "invoice",
@@ -277,13 +298,15 @@ impl Stage for CategorizeStage {
             || sender.starts_with("no-reply")
             || sender.starts_with("noreply")
         {
-            "updates"
+            labels::CATEGORY_UPDATES
         } else {
-            "primary"
-        }
-        .into();
-        if header("x-spam-flag").trim() == "yes" {
-            mail.folder = "spam".into();
+            labels::CATEGORY_PERSONAL
+        };
+        let spam = header("x-spam-flag").trim() == "yes";
+        mail.set_category(category);
+        if spam {
+            mail.remove_label(labels::INBOX);
+            mail.add_label(labels::SPAM);
         }
         Ok(())
     }
@@ -310,14 +333,20 @@ impl Stage for RulesStage {
             if !value.to_lowercase().contains(&rule.contains.to_lowercase()) {
                 continue;
             }
+            let mail = &mut context.mail;
             match rule.action.as_str() {
-                "label" => context.mail.labels.push(rule.value.clone()),
-                "category" => context.mail.category = rule.value.clone(),
-                "archive" => context.mail.folder = "archive".into(),
-                "spam" => context.mail.folder = "spam".into(),
-                "star" => context.mail.starred = true,
-                "important" => context.mail.important = true,
-                "read" => context.mail.is_read = true,
+                "label" => mail.add_label(&rule.value),
+                "category" if labels::CATEGORIES.contains(&rule.value.as_str()) => {
+                    mail.set_category(&rule.value)
+                }
+                "archive" => mail.remove_label(labels::INBOX),
+                "spam" => {
+                    mail.remove_label(labels::INBOX);
+                    mail.add_label(labels::SPAM);
+                }
+                "star" => mail.add_label(labels::STARRED),
+                "important" => mail.add_label(labels::IMPORTANT),
+                "read" => mail.remove_label(labels::UNREAD),
                 _ => {}
             }
         }
@@ -358,10 +387,10 @@ pub async fn persist(
     } else {
         mail.message_id.clone()
     };
-    sqlx::query("INSERT OR IGNORE INTO messages(id,thread_id,message_id,subject,normalized_subject,thread_key,sender,sender_email,recipients,cc,envelope_to,snippet,text,html,raw,received_at,is_read,starred,important,folder,category,is_sent) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    sqlx::query("INSERT OR IGNORE INTO messages(id,thread_id,message_id,subject,normalized_subject,thread_key,sender,sender_email,recipients,cc,envelope_to,snippet,text,html,raw,received_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
         .bind(id).bind(&thread_id).bind(message_id).bind(&mail.subject).bind(&mail.normalized_subject).bind(&mail.thread_key)
         .bind(&mail.sender).bind(&mail.sender_email).bind(&mail.recipients).bind(&mail.cc).bind(serde_json::to_string(&envelope.to)?)
-        .bind(&mail.snippet).bind(&mail.text).bind(&mail.html).bind(raw).bind(received_at).bind(mail.is_read).bind(mail.starred).bind(mail.important).bind(&mail.folder).bind(&mail.category).bind(mail.folder=="sent")
+        .bind(&mail.snippet).bind(&mail.text).bind(&mail.html).bind(raw).bind(received_at)
         .execute(&mut *tx).await?;
     for (index, attachment) in mail.attachments.iter().enumerate() {
         sqlx::query("INSERT OR IGNORE INTO attachments(id,message_id,name,content_type,size,content) VALUES(?,?,?,?,?,?)")

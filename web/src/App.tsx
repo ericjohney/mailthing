@@ -53,13 +53,12 @@ import {
 } from './design-system';
 import { MailboxSidebar } from './mailbox/MailboxSidebar';
 import { ThreadRow } from './mailbox/ThreadRow';
-import { categories, folders } from './mailbox/navigation';
+import { categories, mailboxViews, userLabels } from './mailbox/navigation';
 
 function getRoute(): Route {
   const params = new URLSearchParams(location.hash.slice(1));
   return {
-    folder: params.get('folder') || 'inbox',
-    label: params.get('label') || undefined,
+    label: params.get('label') || 'INBOX',
     thread: params.get('thread') || undefined,
   };
 }
@@ -69,7 +68,7 @@ export function App() {
   const [route, setRoute] = useState(getRoute);
   const [query, setQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [category, setCategory] = useState('primary');
+  const [category, setCategory] = useState('CATEGORY_PERSONAL');
   const [threads, setThreads] = useState<Thread[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -103,8 +102,7 @@ export function App() {
   useEffect(() => setSidebar(false), [mobile]);
   const report = useCallback((message: string) => setToast(message), []);
   const navigate = useCallback((next: Route) => {
-    const params = new URLSearchParams({ folder: next.folder });
-    if (next.label) params.set('label', next.label);
+    const params = new URLSearchParams({ label: next.label });
     if (next.thread) params.set('thread', next.thread);
     location.hash = params.toString();
     setRoute(next);
@@ -163,7 +161,7 @@ export function App() {
     let cancelled = false;
     setLoading(true);
     setLoadError('');
-    if (route.folder === 'drafts' && !searchQuery) {
+    if (route.label === 'DRAFTS' && !searchQuery) {
       api<Draft[]>('/drafts')
         .then((data) => {
           if (!cancelled) {
@@ -179,11 +177,10 @@ export function App() {
         });
     } else {
       const params = new URLSearchParams({
-        folder: route.folder === 'drafts' ? 'all' : route.folder,
+        label: route.label === 'DRAFTS' ? 'ALL' : route.label,
         page: String(page),
       });
-      if (route.label) params.set('label', route.label);
-      if (route.folder === 'inbox' && !searchQuery) params.set('category', category);
+      if (route.label === 'INBOX' && !searchQuery) params.set('category', category);
       if (searchQuery) params.set('q', searchQuery);
       api<{ threads: Thread[]; total: number }>(`/threads?${params}`)
         .then((data) => {
@@ -204,7 +201,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [route.folder, route.label, route.thread, category, searchQuery, page, tick]);
+  }, [route.label, route.thread, category, searchQuery, page, tick]);
   useEffect(() => {
     if (!route.thread) {
       setConversation(undefined);
@@ -217,7 +214,7 @@ export function App() {
       .then((data) => {
         if (cancelled) return;
         setConversation(data);
-        if (data.messages.some((message) => !message.is_read))
+        if (data.messages.some((message) => message.labels.includes('UNREAD')))
           mutate('/actions', { thread_ids: [route.thread], action: 'read' })
             .then(refresh)
             .catch((error) => report(error.message));
@@ -254,7 +251,7 @@ export function App() {
         route.thread &&
         ['archive', 'trash', 'spam', 'snooze', 'unread', 'inbox', 'delete'].includes(name)
       )
-        navigate({ folder: route.folder, label: route.label });
+        navigate({ label: route.label });
       const descriptions: Record<string, string> = {
         archive: 'Conversation archived',
         trash: 'Moved to Trash',
@@ -295,7 +292,7 @@ export function App() {
       if (event.key === '#') doAction('trash');
       if (event.key === 'Escape') {
         setDropdown(undefined);
-        if (route.thread) navigate({ folder: route.folder, label: route.label });
+        if (route.thread) navigate({ label: route.label });
       }
       if (event.key === '?') setHelp(true);
     };
@@ -312,12 +309,12 @@ export function App() {
   }
   const title = searchQuery
     ? 'Search results'
-    : route.folder === 'label'
-      ? settings?.labels.find((label) => label.id === route.label)?.name || 'Label'
-      : folders.find((folder) => folder.id === route.folder)?.name || 'Inbox';
+    : mailboxViews.find((view) => view.id === route.label)?.name ||
+      settings?.labels.find((label) => label.id === route.label)?.name ||
+      'Label';
   const selectionCount = selected.size;
-  const isDrafts = route.folder === 'drafts' && !searchQuery;
-  const showCategories = route.folder === 'inbox' && !route.thread && !searchQuery;
+  const isDrafts = route.label === 'DRAFTS' && !searchQuery;
+  const showCategories = route.label === 'INBOX' && !route.thread && !searchQuery;
 
   if (!settings)
     return (
@@ -346,7 +343,7 @@ export function App() {
           <a
             className="brand"
             aria-label="Mailthing inbox"
-            href="#folder=inbox"
+            href="#label=INBOX"
             onClick={() => setQuery('')}
           >
             <span>
@@ -361,7 +358,7 @@ export function App() {
             onSubmit={(event) => {
               event.preventDefault();
               setSearchQuery(query.trim());
-              if (route.thread) navigate({ folder: route.folder, label: route.label });
+              if (route.thread) navigate({ label: route.label });
             }}
           >
             <Search size={21} />
@@ -372,7 +369,7 @@ export function App() {
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
-                if (route.thread) navigate({ folder: route.folder, label: route.label });
+                if (route.thread) navigate({ label: route.label });
               }}
             />
             {query && (
@@ -498,10 +495,7 @@ export function App() {
                 <ShieldAlert size={36} />
                 <h2>We couldn’t open this conversation</h2>
                 <p>{loadError}</p>
-                <Button
-                  variant="secondary"
-                  onClick={() => navigate({ folder: route.folder, label: route.label })}
-                >
+                <Button variant="secondary" onClick={() => navigate({ label: route.label })}>
                   <ArrowLeft size={16} />
                   Back to mailbox
                 </Button>
@@ -510,9 +504,9 @@ export function App() {
               <Conversation
                 key={route.thread}
                 data={conversation}
-                labels={settings.labels}
+                labels={userLabels(settings.labels)}
                 report={report}
-                onBack={() => navigate({ folder: route.folder, label: route.label })}
+                onBack={() => navigate({ label: route.label })}
                 action={(name, value, until) => doAction(name, undefined, value, until)}
                 compose={setCompose}
                 mailboxEmail={settings.account.email}
@@ -532,7 +526,7 @@ export function App() {
               description={
                 searchQuery
                   ? `Results for “${searchQuery}”`
-                  : route.folder === 'inbox'
+                  : route.label === 'INBOX'
                     ? new Date().toLocaleDateString([], {
                         weekday: 'long',
                         month: 'long',
@@ -594,7 +588,8 @@ export function App() {
                                         value === 'All' ||
                                         (value === 'Read' && !thread.unread) ||
                                         (value === 'Unread' && thread.unread) ||
-                                        (value === 'Starred' && thread.starred),
+                                        (value === 'Starred' &&
+                                          thread.label_ids.includes('STARRED')),
                                     )
                                     .map((thread) => thread.id),
                                 ),
@@ -629,9 +624,9 @@ export function App() {
                   </IconButton>
                   <IconButton
                     label={
-                      route.folder === 'trash' ? 'Delete selected permanently' : 'Trash selected'
+                      route.label === 'TRASH' ? 'Delete selected permanently' : 'Trash selected'
                     }
-                    onClick={() => doAction(route.folder === 'trash' ? 'delete' : 'trash')}
+                    onClick={() => doAction(route.label === 'TRASH' ? 'delete' : 'trash')}
                     disabled={busy}
                   >
                     <Trash2 size={18} />
@@ -668,7 +663,7 @@ export function App() {
                     {dropdown === 'labels' && (
                       <div className="dropdown">
                         <span className="dropdown-heading">Apply a label</span>
-                        {settings.labels.map((label) => (
+                        {userLabels(settings.labels).map((label) => (
                           <button
                             key={label.id}
                             onClick={() => doAction('label', undefined, label.id)}
@@ -801,28 +796,28 @@ export function App() {
                   <h2>
                     {searchQuery
                       ? 'No matching conversations'
-                      : route.folder === 'drafts'
+                      : route.label === 'DRAFTS'
                         ? 'A fresh page awaits'
-                        : route.folder === 'inbox'
+                        : route.label === 'INBOX'
                           ? 'Room for what matters'
                           : 'Nothing here for now'}
                   </h2>
                   <p>
                     {searchQuery
                       ? 'Try a different search or include in:anywhere to search Spam and Trash.'
-                      : route.folder === 'inbox'
-                        ? `Mail received by your server appears here. ${category !== 'primary' ? 'This category is clear for now.' : 'Your inbox is ready when you are.'}`
-                        : route.folder === 'drafts'
+                      : route.label === 'INBOX'
+                        ? `Mail received by your server appears here. ${category !== 'CATEGORY_PERSONAL' ? 'This category is clear for now.' : 'Your inbox is ready when you are.'}`
+                        : route.label === 'DRAFTS'
                           ? 'Start a message. We’ll save your thoughts as you go.'
                           : 'Conversations you move here will appear in this space.'}
                   </p>
-                  {route.folder === 'drafts' ? (
+                  {route.label === 'DRAFTS' ? (
                     <Button variant="secondary" onClick={() => setCompose(emptyDraft())}>
                       <Pencil size={16} />
                       Write a message
                     </Button>
                   ) : (
-                    route.folder === 'inbox' && (
+                    route.label === 'INBOX' && (
                       <button className="subtle-link" onClick={() => setSettingsTab('server')}>
                         View mail connections <ChevronRight size={14} />
                       </button>
@@ -862,6 +857,7 @@ export function App() {
                   <ThreadRow
                     key={thread.id}
                     thread={thread}
+                    labels={userLabels(settings.labels)}
                     selected={selected.has(thread.id)}
                     onSelect={() => toggle(thread.id)}
                     onOpen={() => navigate({ ...route, thread: thread.id })}
@@ -929,8 +925,8 @@ export function App() {
               ))}
             </div>
             <p className="muted small">
-              Search supports from:, to:, subject:, is:unread, is:starred, has:attachment, before:
-              and after: dates, and in:anywhere.
+              Search supports from:, to:, subject:, label:, category:, is:unread, is:starred,
+              has:attachment, before: and after: dates, and in:anywhere.
             </p>
           </div>
         </Modal>

@@ -83,21 +83,37 @@ pub fn now() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
+/// Conversation totals and unread conversations per label id, plus `DRAFTS`.
+/// Spam and trash are only counted under their own labels, as in Gmail.
 pub async fn counts(pool: &SqlitePool) -> Result<serde_json::Value> {
-    let rows = sqlx::query("SELECT folder, COUNT(DISTINCT thread_id) AS total, COUNT(DISTINCT CASE WHEN is_read=0 THEN thread_id END) AS unread FROM messages WHERE snoozed_until IS NULL OR snoozed_until <= ? GROUP BY folder")
-        .bind(now()).fetch_all(pool).await?;
+    let rows = sqlx::query("SELECT ml.label_id, COUNT(DISTINCT m.thread_id) AS total, COUNT(DISTINCT CASE WHEN EXISTS(SELECT 1 FROM message_labels u WHERE u.message_id=m.id AND u.label_id='UNREAD') THEN m.thread_id END) AS unread FROM message_labels ml JOIN messages m ON m.id=ml.message_id WHERE ml.label_id IN ('SPAM','TRASH') OR NOT EXISTS(SELECT 1 FROM message_labels x WHERE x.message_id=m.id AND x.label_id IN ('SPAM','TRASH')) GROUP BY ml.label_id")
+        .fetch_all(pool).await?;
     let mut counts = serde_json::Map::new();
     for row in rows {
-        counts.insert(row.get::<String,_>("folder"), serde_json::json!({"total": row.get::<i64,_>("total"), "unread": row.get::<i64,_>("unread")}));
+        counts.insert(row.get::<String,_>("label_id"), serde_json::json!({"total": row.get::<i64,_>("total"), "unread": row.get::<i64,_>("unread")}));
     }
     let drafts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM drafts")
         .fetch_one(pool)
         .await?;
-    let sent: i64 = sqlx::query_scalar("SELECT COUNT(DISTINCT thread_id) FROM messages WHERE is_sent=1 AND folder NOT IN ('spam','trash')").fetch_one(pool).await?;
-    counts.insert("sent".into(), serde_json::json!({"total":sent,"unread":0}));
     counts.insert(
-        "drafts".into(),
+        "DRAFTS".into(),
         serde_json::json!({"total":drafts,"unread":0}),
     );
     Ok(counts.into())
+}
+
+/// Returns snoozed messages whose time has come to the inbox. Returns how many woke.
+pub async fn wake_snoozed(pool: &SqlitePool) -> Result<u64> {
+    let now = now();
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    sqlx::query("INSERT OR IGNORE INTO message_labels(message_id,label_id) SELECT m.id,'INBOX' FROM messages m JOIN message_labels ml ON ml.message_id=m.id AND ml.label_id='SNOOZED' WHERE m.snoozed_until<=?")
+        .bind(now).execute(&mut *tx).await?;
+    let woke = sqlx::query("DELETE FROM message_labels WHERE label_id='SNOOZED' AND message_id IN(SELECT id FROM messages WHERE snoozed_until<=?)")
+        .bind(now).execute(&mut *tx).await?.rows_affected();
+    sqlx::query("UPDATE messages SET snoozed_until=NULL WHERE snoozed_until<=?")
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(woke)
 }

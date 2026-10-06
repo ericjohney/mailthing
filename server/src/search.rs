@@ -1,3 +1,4 @@
+use crate::labels;
 use anyhow::{Result, bail};
 use sqlx::{QueryBuilder, Sqlite};
 
@@ -30,7 +31,11 @@ pub fn parse(query: &str) -> Result<Vec<Term>> {
     let mut result = Vec::new();
     for word in words {
         if let Some((field, value)) = word.split_once(':') {
-            if ["from", "to", "subject", "is", "has", "in"].contains(&field) {
+            if [
+                "from", "to", "subject", "is", "has", "in", "label", "category",
+            ]
+            .contains(&field)
+            {
                 result.push(Term::Field(field.into(), value.into()));
                 continue;
             }
@@ -89,31 +94,35 @@ pub fn append(builder: &mut QueryBuilder<'_, Sqlite>, terms: &[Term]) {
                         .push(" AND m.subject LIKE ")
                         .push_bind(format!("%{value}%"));
                 }
-                "is" if value == "unread" => {
-                    builder.push(" AND m.is_read=0");
-                }
-                "is" if value == "read" => {
-                    builder.push(" AND m.is_read=1");
-                }
-                "is" if value == "starred" => {
-                    builder.push(" AND m.starred=1");
-                }
-                "is" if value == "important" => {
-                    builder.push(" AND m.important=1");
+                "is" | "in" if system_label(value).is_some() => {
+                    let label = system_label(value).expect("Checked above");
+                    if value.eq_ignore_ascii_case("read") {
+                        builder.push(" AND NOT ").push(labels::has(labels::UNREAD));
+                    } else {
+                        builder.push(" AND ").push(labels::has(label));
+                    }
                 }
                 "has" if value == "attachment" => {
                     builder
                         .push(" AND EXISTS(SELECT 1 FROM attachments a WHERE a.message_id=m.id)");
                 }
                 "in" if value == "anywhere" => {}
-                "in" if value == "sent" => {
-                    builder.push(" AND m.is_sent=1 AND m.folder NOT IN ('spam','trash')");
-                }
                 "in" if value == "all" => {
-                    builder.push(" AND m.folder NOT IN ('spam','trash')");
+                    builder.push(" AND ").push(labels::visible());
                 }
-                "in" => {
-                    builder.push(" AND m.folder=").push_bind(value.clone());
+                "label" => {
+                    // Gmail writes spaces in label names as hyphens in searches.
+                    builder
+                        .push(" AND EXISTS(SELECT 1 FROM message_labels ml JOIN labels l ON l.id=ml.label_id WHERE ml.message_id=m.id AND (l.name=")
+                        .push_bind(value.clone())
+                        .push(" OR l.name=")
+                        .push_bind(value.replace('-', " "))
+                        .push("))");
+                }
+                "category" if labels::category(value).is_some() => {
+                    builder
+                        .push(" AND ")
+                        .push(labels::has(labels::category(value).expect("Checked above")));
                 }
                 _ => {
                     builder.push(" AND 0=1");
@@ -127,4 +136,27 @@ pub fn append(builder: &mut QueryBuilder<'_, Sqlite>, terms: &[Term]) {
             .push_bind(texts.join(" AND "))
             .push(")");
     }
+}
+
+/// Maps `is:`/`in:` keywords to system labels. `is:read` maps to UNREAD and is negated.
+fn system_label(value: &str) -> Option<&'static str> {
+    Some(match value.to_ascii_lowercase().as_str() {
+        "unread" | "read" => labels::UNREAD,
+        "starred" => labels::STARRED,
+        "important" => labels::IMPORTANT,
+        "inbox" => labels::INBOX,
+        "sent" => labels::SENT,
+        "spam" => labels::SPAM,
+        "trash" => labels::TRASH,
+        "snoozed" => labels::SNOOZED,
+        _ => return None,
+    })
+}
+
+/// Whether the search explicitly asks for spam or trash, which are hidden otherwise.
+pub fn includes_hidden(terms: &[Term]) -> bool {
+    terms.iter().any(|term| {
+        matches!(term, Term::Field(field, value)
+            if field == "in" && ["anywhere", "spam", "trash"].contains(&value.to_ascii_lowercase().as_str()))
+    })
 }

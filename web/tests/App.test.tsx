@@ -7,8 +7,11 @@ import type { Settings, Thread } from '../src/types';
 
 const settings: Settings = {
   account: { name: 'Alex Morgan', email: 'alex@example.com' },
-  labels: [{ id: 'work', name: 'Work', color: '#2a6b53' }],
-  counts: { inbox: { total: 1, unread: 1 }, drafts: { total: 0, unread: 0 } },
+  labels: [
+    { id: 'INBOX', name: 'Inbox', color: '#000000', kind: 'system' },
+    { id: 'work', name: 'Work', color: '#2a6b53', kind: 'user' },
+  ],
+  counts: { INBOX: { total: 1, unread: 1 }, DRAFTS: { total: 0, unread: 0 } },
   outbound_configured: false,
   smtp_port: 2500,
   max_message_bytes: 26214400,
@@ -22,11 +25,8 @@ const thread: Thread = {
   received_at: Date.now(),
   count: 1,
   unread: 1,
-  starred: false,
-  important: false,
   has_attachment: false,
-  category: 'primary',
-  labels: '',
+  label_ids: ['INBOX', 'UNREAD', 'CATEGORY_PERSONAL'],
 };
 let calls: { path: string; method: string; body: any }[];
 let mailbox: Thread[];
@@ -63,12 +63,8 @@ beforeEach(() => {
               text: 'Coffee on Saturday?',
               html: '',
               received_at: thread.received_at,
-              is_read: false,
-              starred: false,
-              important: false,
-              folder: 'inbox',
-              category: 'primary',
               snoozed_until: null,
+              labels: ['INBOX', 'UNREAD', 'CATEGORY_PERSONAL'],
             },
           ],
           attachments: [],
