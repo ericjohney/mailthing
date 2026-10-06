@@ -1,0 +1,127 @@
+/* Foundations are theme-independent. Components consume semantic roles below. */
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-body: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 28px;
+  --font-size-display: 34px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-reading: 1.75;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-round: 50%;
+  --sidebar-width: 225px;
+  --header-height: 82px;
+  --row-height: 54px;
+  --control-height: 40px;
+  --icon-control-size: 34px;
+  --duration-fast: 120ms;
+  --easing-standard: ease;
+  --z-search: 10;
+  --z-popover: 20;
+  --z-compose: 30;
+  --z-scrim: 39;
+  --z-drawer: 40;
+  --z-toast: 70;
+}
+
+/* Crisp monochrome — light. Omitted/invalid preferences also use this palette. */
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --color-canvas: #ffffff;
+  --color-surface: #ffffff;
+  --color-sidebar: #f8f9f8;
+  --color-surface-subtle: #f8f9f8;
+  --color-surface-hover: #f0f2f1;
+  --color-surface-selected: #e9eceb;
+  --color-text: #292c2d;
+  --color-text-secondary: #636b70;
+  --color-text-muted: #6e7476;
+  --color-border: #e5e7e6;
+  --color-border-strong: #bac1c2;
+  --color-action: #292c2d;
+  --color-action-hover: #44494b;
+  --color-on-action: #ffffff;
+  --color-focus: #606b70;
+  --color-avatar: #eceeed;
+  --color-avatar-text: #69716e;
+  --color-star: #65705f;
+  --color-status-success: #526f59;
+  --color-status-warning: #8a6737;
+  --color-status-danger: #a23e3e;
+  --color-danger-hover: #842e2e;
+  --color-on-danger: #ffffff;
+  --color-danger-surface: #f9eeee;
+  --color-inverse-surface: #292c2d;
+  --color-inverse-text: #ffffff;
+  --color-backdrop: #151b1e4d;
+  --color-email-surface: #ffffff;
+  --color-email-text: #292c2d;
+  --color-email-link: #4a5960;
+  --color-email-border: #d7dddf;
+  --shadow-popover: 0 8px 24px #1e242818;
+  --shadow-dialog: 0 18px 60px #1e242824;
+  --shadow-compose: 0 5px 40px #1e24282e;
+  --shadow-toast: 0 4px 20px #00000020;
+}
+
+/* The same roles and geometry; no component-specific dark-mode selectors. */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #171a1b;
+  --color-surface: #202425;
+  --color-sidebar: #1b1e1f;
+  --color-surface-subtle: #1c2021;
+  --color-surface-hover: #2c3234;
+  --color-surface-selected: #343b3d;
+  --color-text: #e5e8e7;
+  --color-text-secondary: #b5bdbe;
+  --color-text-muted: #a4adb0;
+  --color-border: #343b3d;
+  --color-border-strong: #596669;
+  --color-action: #e0e5e3;
+  --color-action-hover: #cbd4d1;
+  --color-on-action: #232829;
+  --color-focus: #b8c8cc;
+  --color-avatar: #333b3c;
+  --color-avatar-text: #c1ccca;
+  --color-star: #bcc9bf;
+  --color-status-success: #9cba9e;
+  --color-status-warning: #d8b87c;
+  --color-status-danger: #efb0b0;
+  --color-danger-hover: #ffc7c7;
+  --color-on-danger: #421b1b;
+  --color-danger-surface: #3e2929;
+  --color-inverse-surface: #e0e5e3;
+  --color-inverse-text: #232829;
+  --color-backdrop: #03060999;
+  --color-email-surface: #202425;
+  --color-email-text: #e5e8e7;
+  --color-email-link: #b7c6c9;
+  --color-email-border: #4b585b;
+  --shadow-popover: 0 8px 24px #00000045;
+  --shadow-dialog: 0 18px 60px #00000066;
+  --shadow-compose: 0 5px 40px #00000066;
+  --shadow-toast: 0 4px 20px #00000040;
+}

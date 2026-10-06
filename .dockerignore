@@ -1,4 +1,7 @@
+.git
 node_modules
-out
-.next
-.vscode
+target
+dist
+data
+.env
+test-results

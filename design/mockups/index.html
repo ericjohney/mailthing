@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mailthing — five design directions</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-style="monochrome" data-view="inbox">
+    <div class="study-shell">
+      <header class="study-header">
+        <a class="study-brand" href="./">mailthing<span> / design studies</span></a>
+        <a class="study-badge" href="overview.html">COMPARE ALL FIVE ↗</a>
+      </header>
+      <section class="study-intro">
+        <div><p class="study-eyebrow">A DIFFERENT FEEL FOR YOUR EVERYDAY MAIL</p><h1>Find your kind of inbox.</h1></div>
+        <p>Same conversations. Five visual directions.<br />Explore the inbox, open a message, and find what feels like you.</p>
+      </section>
+      <nav class="style-picker" aria-label="Design direction">
+        <button data-style="monochrome"><span class="style-number">01</span><span><strong>Crisp monochrome</strong><small>Clear. Quiet. Precise.</small></span><i class="swatch swatch-mono"></i></button>
+        <button data-style="macos"><span class="style-number">02</span><span><strong>Native macOS</strong><small>Soft. Familiar. Refined.</small></span><i class="swatch swatch-mac"></i></button>
+        <button data-style="superhuman"><span class="style-number">03</span><span><strong>Superhuman-inspired</strong><small>Focused. Fast. After dark.</small></span><i class="swatch swatch-dark"></i></button>
+        <button data-style="editorial"><span class="style-number">04</span><span><strong>Warm editorial</strong><small>Thoughtful. Human. Spacious.</small></span><i class="swatch swatch-warm"></i></button>
+        <button data-style="material"><span class="style-number">05</span><span><strong>Modern Material</strong><small>Friendly. Bright. Effortless.</small></span><i class="swatch swatch-material"></i></button>
+      </nav>
+      <div class="study-controls">
+        <div class="view-picker" aria-label="Preview view"><button data-view="inbox">Inbox</button><button data-view="reader">Reading view</button></div>
+        <p id="style-description">A restrained palette, clear hierarchy, and almost no visual decoration.</p>
+        <label class="density-picker">Density <select id="density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+      </div>
+      <div id="mockup" class="mockup-frame" aria-label="Mailthing design preview"></div>
+      <footer class="study-footer"><span>Interactive design preview · fictional sample mail</span><span>Try search, categories, stars, Compose, and opening a conversation.</span></footer>
+    </div>
+    <div id="preview-toast" role="status" hidden></div>
+    <script src="mockups.js"></script>
+  </body>
+</html>
