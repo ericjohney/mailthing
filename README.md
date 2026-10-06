@@ -1,42 +1,130 @@
-# mailthing
+# Mailthing
 
-Mailthing is a development SMTP mail server catches all emails and displays them in an easy to see UI! Mailthing is perfect for running on your development machine to test and debug messages sent from your web application you're working on.
+A personal catch-all mail server and a Gmail-style web inbox, rebuilt in Rust and React. Mail is durably queued, processed, and displayed from SQLite. The application starts with an empty mailbox; it never substitutes sample messages for database results.
 
-Just configure your application to use mailthing's smtp server, then just load up mailthing's web interface to see your emails. Easy!
+## Run locally
 
-## Installation
+Install current stable Rust (with `rustfmt` and `clippy`) and Node.js 24. Rust compilation also needs a C compiler; on Debian/Ubuntu, install `build-essential`.
 
-```shell
-$ yarn install
+```sh
+cp .env.example .env
+npm ci
+npm run build
+cargo run --bin mailthing
 ```
 
-### Running
+Open **http://127.0.0.1:9005**. Incoming SMTP listens on **port 2500**. Configure your mailbox name and sending address in **Settings → General**. `MAILBOX_NAME` and `MAILBOX_EMAIL` set the initial defaults only; later changes persist in the database.
 
-Use this when running in production mode
+For frontend development, keep the Rust server running and run `npm run dev` in another terminal. Open **http://127.0.0.1:5173**; Vite proxies `/api` to the Rust server. Restart the Rust server after backend changes.
 
-```shell
-$ yarn build
-$ yarn start
+Send a test email using Python's standard library:
+
+```sh
+python3 scripts/send-example.py
 ```
 
-### Developing
+To add an optional collection of fictional example messages to a local instance, run `python3 scripts/send-example.py --demo`. This is explicit, uses SMTP, and goes through the same queue and processing pipeline as other incoming mail.
 
-This will start the development server and reload changes
+## Mailbox features
 
-```shell
-$ yarn dev
+- Threaded conversations; HTML, plain-text, original source, and downloadable attachments.
+- Inbox categories: Primary, Promotions, Social, and Updates.
+- Stars, importance, read/unread, archive, snooze, Spam, Trash, and permanent deletion from Trash.
+- Custom labels and ordered filters configured in Settings.
+- Compose, reply, reply-all, forward, Cc/Bcc, attachments, and durable drafts.
+- Full-text search, bulk actions, pagination, live updates, keyboard shortcuts, and mobile layouts.
+- Crisp monochrome appearance with light, dark, and device-following themes; password sign-in when configured.
+- `.eml` import and a live processing dashboard with failed-receipt retry.
+
+Search examples:
+
+```text
+from:sam@example.net subject:"weekend plans"
+is:unread has:attachment
+after:2026-01-01 before:2026-02-01
+coffee in:anywhere
 ```
 
-### Configuration
+Dates are evaluated at midnight UTC. Search excludes Spam and Trash unless `in:anywhere` or an explicit folder is included. Category assignment is a lightweight heuristic, overridden by your filters. Existing spam flags are honored; the server does not claim to perform antivirus scanning or statistical spam detection.
 
-Uses the following Environment Variables
+The React interface uses a shared [design system](web/src/design-system/README.md). Semantic palette, typography, spacing, and control tokens live in `web/src/design-system/tokens.css`; reusable controls share hover, focus, and disabled behavior. Screen styles consume those tokens, so new palettes or density changes can share the same components. Appearance is configurable in Settings → General.
 
-- PORT (default: 9005) - the ui webserver listens to this port
-- SMTP_PORT (default: 2500) - the smtp server runs on this port
-- SQLITE_DB (default: ':memory:') - set to a filesystem path to persist messages to disk
+## Sending mail
 
-Set your application to use mailthing's SMTP server. The default port is 2500. It will accept any authentication.
+Add your relay credentials to `.env` and restart:
 
+```dotenv
+SMTP_RELAY_HOST=smtp.example.com
+SMTP_RELAY_PORT=587
+SMTP_RELAY_USER=your-user
+SMTP_RELAY_PASSWORD=your-password
+SMTP_RELAY_SECURITY=starttls
 ```
-localhost:2500
+
+Use `tls` for implicit TLS (usually port 465). `plain` is intended for a trusted local relay. Outbound mail is disabled until a relay host is configured. Sent messages are saved only after the relay accepts them, and failures retain the draft. Cc and Bcc recipients are included in the SMTP envelope; Bcc is removed from delivered headers. The receiving server never forwards messages automatically, so it cannot act as an open relay.
+
+If the process stops after a relay has accepted a message but before its database commit, the raw outgoing receipt remains in the jobs table with an explicit ambiguous-delivery error. Check relay delivery before manually resending; Mailthing never automatically retries ambiguous outbound sends.
+
+## Receiving internet mail
+
+For your domain, point its MX record to the hostname of this server, give that hostname an A/AAAA record, and make TCP **port 25** reachable. Set `SMTP_PORT=25` or map external port 25 to the application's unprivileged SMTP port. Ports 2500 and 587 are not used by external MX senders. This is a single-owner catch-all: mail addressed to any valid recipient at this server enters this mailbox.
+
+Set `SMTP_TLS_CERT` and `SMTP_TLS_KEY` to PEM files to advertise STARTTLS on incoming SMTP. Use your outbound relay's verified domain and SPF/DKIM setup for outbound deliverability. Mailthing provides SMTP receipt and its own web mailbox; it does not implement IMAP/POP3, direct-to-MX outbound delivery, or a complete Gmail service.
+
+The web interface defaults to localhost. Set `APP_PASSWORD` before binding `WEB_HOST` to a public address; the server enforces this requirement. Place a public web deployment behind HTTPS and set `COOKIE_SECURE=true`. Sessions use HttpOnly, SameSite cookies, cross-site mutations are rejected, HTML is sanitized, remote email images are removed, and email HTML is rendered inside a sandboxed frame. No external fonts or trackers are loaded by the application.
+
+## Storage and processing architecture
+
+```text
+SMTP DATA / .eml import
+        ↓
+durable SQLite job → SMTP 250 acknowledgment
+        ↓
+bounded worker pool (blocking MIME work off the async runtime)
+        ↓
+Parse MIME → Sanitize content → Categorize → Apply mailbox rules
+        ↓
+atomic message + attachments + labels + job-completion transaction
+        ↓
+SQLite / FTS5 → Rust API → live React inbox
 ```
+
+SQLite uses WAL, full synchronization, indexed mailbox queries, and FTS5. Writes that resolve conversation threads use `BEGIN IMMEDIATE` so concurrent processing cannot fail when upgrading a read transaction to a write. Workers claim jobs atomically, retry failed incoming receipts up to three times, and preserve failed raw mail. On restart, unfinished incoming jobs return to the queue. SMTP acknowledges only after the original receipt has been saved; processing cannot silently lose an acknowledged email. Permanent message deletion also deletes its attachments and search entries.
+
+The `Stage` trait in **`server/src/pipeline.rs`** is the extension point. Add a stage implementation and include it in `Pipeline::default()` to change the pipeline. Stages transform a `PipelineContext`; database persistence stays outside the transformation chain. Unit tests can run stages without SMTP or a database. UI-configured filters use the last stage, so common mailbox changes require no code. Database changes belong in a new numbered migration in `server/migrations`; applied migrations are recorded and checksum-checked by SQLx.
+
+`PIPELINE_CONCURRENCY` defaults to 4 and is bounded to 1–32. `MAX_MESSAGE_BYTES` defaults to 25 MiB. Incoming SMTP limits concurrent sessions and recipient counts, has bounded line lengths, and times out idle sessions. Message threading prefers `References`/`In-Reply-To`, then uses normalized subjects and participants for recent conversations.
+
+One process owns a database. Run one Mailthing instance per database because startup recovery requeues interrupted claims. Completed job payloads are cleared once the original is stored with the message. Back up SQLite using its backup API or stop the server before copying the database; do not copy only the main database file while WAL writes are active. The default database is **`data/mailthing.db`** and survives restarts.
+
+## Production and Docker
+
+```sh
+npm run build
+cargo build --locked --release
+./target/release/mailthing
+```
+
+Or set `APP_PASSWORD` in `.env`, then:
+
+```sh
+docker compose up --build -d
+```
+
+The container runs as an unprivileged user and stores mail in a named volume. The supplied Compose file exposes the web app only on localhost and SMTP on port 2500. Adjust the port mapping for an actual MX deployment and mount certificate files if using incoming STARTTLS. A `/health` endpoint supports container liveness checks.
+
+## Tests
+
+```sh
+npm run check
+npx playwright install --with-deps chromium
+npm run test:e2e
+```
+
+`npm run check` builds/types-checks the web app, runs React interaction tests, checks Rust formatting and Clippy, and runs Rust integration tests. Server tests use isolated temporary databases and local SMTP sockets. They cover MIME decoding, HTML safety, attachments, filters, threading, recovery, idempotent persistence, burst concurrency, SMTP catch-all receipt and size limits, authenticated API access, cross-site mutation rejection, search, snooze, bulk actions, draft retention, and outbound delivery with attachments and Bcc.
+
+The browser test starts its own Rust server and temporary database. It covers sign-in, pipeline import/live arrival, starring, reading/replying, saved drafts, archive/search, configuration, and a mobile compose view. GitHub Actions runs all checks.
+
+## Configuration reference
+
+See **`.env.example`** for every supported setting. Mailbox identity, labels, and filters are stored in SQLite and editable in the app. Server binding, storage location, authentication, TLS, relay credentials, worker count, and message limits are environment configuration.

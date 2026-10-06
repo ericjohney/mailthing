@@ -1,0 +1,279 @@
+.settings-modal {
+  width: 680px;
+}
+.settings-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 var(--space-5);
+  overflow: auto;
+}
+.settings-tabs > .tab {
+  white-space: nowrap;
+  gap: var(--space-2);
+}
+.settings-content {
+  padding: var(--space-7);
+  overflow: auto;
+  max-height: calc(100dvh - 220px);
+  min-height: 340px;
+}
+.settings-content h3 {
+  font-size: var(--font-size-md);
+  letter-spacing: -0.2px;
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: 9px;
+}
+.settings-content > p {
+  font-size: var(--font-size-base);
+  line-height: 1.8;
+  margin-bottom: 21px;
+}
+.form-row {
+  display: flex;
+  gap: 15px;
+}
+.form-row > * {
+  flex: 1;
+  min-width: 0;
+}
+.settings-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-7) 0;
+}
+.theme-options {
+  display: flex;
+  gap: 13px;
+  margin-top: 15px;
+}
+.theme-options button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--font-size-sm);
+  width: 145px;
+  flex-wrap: wrap;
+}
+.theme-options button[aria-pressed='true'] {
+  border-color: var(--color-action);
+  color: var(--color-action);
+}
+.theme-options button > svg {
+  margin-left: auto;
+}
+.theme-preview {
+  height: 59px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) 9px var(--space-2) 25px;
+  position: relative;
+}
+.theme-preview:before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-selected);
+}
+.theme-preview i {
+  height: 8px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+.inline-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 22px 0;
+}
+.inline-form > input {
+  flex: 1;
+}
+.inline-form > input[type='color'] {
+  width: 43px;
+  flex: none;
+  height: 39px;
+  padding: var(--space-1);
+}
+.inline-form .button-primary {
+  padding: 11px 14px;
+}
+.settings-list > div {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 13px 2px;
+  font-size: var(--font-size-base);
+}
+.settings-list .icon-button {
+  margin-left: auto;
+}
+.settings-list small {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-top: 5px;
+}
+.settings-list > p {
+  font-size: var(--font-size-base);
+  padding: var(--space-5) 0;
+}
+.rule-form {
+  padding: 17px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  margin-top: 22px;
+}
+.settings-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+.settings-section-heading h3 {
+  margin: 0;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  padding: 5px var(--space-2);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.pipeline-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-5) 0;
+  margin: 22px 0;
+}
+.pipeline-metrics > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  border-right: 1px solid var(--color-border);
+}
+.pipeline-metrics > div:last-child {
+  border: 0;
+}
+.pipeline-metrics strong {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.6px;
+}
+.pipeline-metrics small {
+  font-size: var(--font-size-base);
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+.pipeline-metrics span {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.pipeline-stages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: 15px;
+}
+.pipeline-stages > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-surface-subtle);
+  padding: var(--space-3) 14px;
+  border-radius: var(--radius-sm);
+}
+.pipeline-stages > div > span {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-round);
+  background: var(--color-surface-selected);
+  color: var(--color-action);
+  font-size: var(--font-size-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pipeline-stages strong {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+}
+.pipeline-stages svg {
+  color: var(--color-action);
+  margin-left: auto;
+}
+.pipeline-failure {
+  border: 1px solid var(--color-status-warning);
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  margin-top: 15px;
+  font-size: var(--font-size-sm);
+}
+.pipeline-failure p {
+  margin: var(--space-2) 0 var(--space-3);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.connection-card {
+  display: flex;
+  gap: 14px;
+  padding: var(--space-5) 0;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+}
+.connection-card > div:nth-child(2) {
+  flex: 1;
+}
+.connection-card strong {
+  font-size: var(--font-size-base);
+}
+.connection-card p {
+  font-size: var(--font-size-sm);
+  margin: 6px 0;
+  color: var(--color-text-muted);
+}
+.connection-card small {
+  font-size: var(--font-size-xs);
+  line-height: 1.8;
+  color: var(--color-text-muted);
+  display: block;
+  max-width: 380px;
+}
+.connection-icon {
+  width: 45px;
+  height: 45px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-selected);
+  color: var(--color-action);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.settings-content > .connection-card + p {
+  margin-top: 14px;
+}
+.file-import {
+  cursor: pointer;
+}

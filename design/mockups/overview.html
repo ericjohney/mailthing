@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mailthing — design comparison</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 32px; background: #f1f0ec; color: #323630; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; max-width: 1800px; margin: auto; }
+      .intro { padding: 32px; display: flex; flex-direction: column; justify-content: center; }
+      .wordmark { font-size: 18px; letter-spacing: -.7px; font-weight: 650; margin: 0 0 28px; }
+      .wordmark span { color: #8e9489; font-size: 12px; font-weight: 400; margin-left: 7px; letter-spacing: 0; }
+      .eyebrow { font-size: 10px; letter-spacing: 1.8px; color: #8c9384; margin: 0 0 16px; }
+      h1 { font-weight: 450; font-size: 58px; line-height: 1.07; letter-spacing: -2.8px; margin: 0 0 24px; }
+      .intro > p { color: #858d7e; font-size: 15px; line-height: 1.75; max-width: 470px; margin: 0; }
+      .intro nav { display: flex; gap: 9px; margin-top: 35px; }
+      .intro nav a { text-decoration: none; color: #777f70; border: 1px solid #d7dbd0; border-radius: 20px; padding: 8px 17px; font-size: 11px; }
+      .intro nav a[aria-current="page"] { background: #41483b; border-color: #41483b; color: white; }
+      article { border-radius: 10px; overflow: hidden; background: #fff; border: 1px solid #dde0d7; }
+      article header { display: flex; align-items: center; padding: 18px 20px; gap: 12px; }
+      article header > span { font-size: 11px; color: #a0a79b; }
+      article h2 { font-weight: 550; font-size: 15px; margin: 0; letter-spacing: -.25px; }
+      article p { margin: 3px 0 0; font-size: 10px; color: #949c8d; }
+      article header a { margin-left: auto; text-decoration: none; color: #7d8776; font-size: 12px; }
+      article > a { display: block; }
+      article img { display: block; width: 100%; height: auto; border-top: 1px solid #eef0ea; }
+      .colors { display: flex; gap: 5px; margin-left: auto; padding-right: 15px; }
+      .colors i { display: block; width: 12px; height: 12px; border: 1px solid #0000000a; border-radius: 50%; }
+      footer { display: flex; justify-content: space-between; margin: 23px auto 0; max-width: 1800px; font-size: 10px; color: #a1a898; }
+      footer a { color: inherit; }
+      @media (max-width: 800px) { body { padding: 16px; } main { grid-template-columns: 1fr; gap: 15px; } .intro { padding: 25px 12px; } h1 { font-size: 45px; } .wordmark { margin-bottom: 32px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="intro">
+        <p class="wordmark">mailthing<span> / design studies</span></p>
+        <p class="eyebrow">FIVE DIRECTIONS · ONE PERSONAL MAILBOX</p>
+        <h1>Your inbox.<br />Your kind of space.</h1>
+        <p>Five ways to make everyday email feel a little more personal. The same conversations and familiar workflow, with a different visual character.</p>
+        <nav aria-label="Comparison view"><a href="?view=inbox" data-view="inbox">Inbox</a><a href="?view=reader" data-view="reader">Reading view</a><a href="./">Interactive gallery ↗</a></nav>
+      </section>
+    </main>
+    <footer><span>Concept studies · fictional sample mail · October 2026</span><a href="./">Explore all five directions in the interactive gallery ↗</a></footer>
+    <script>
+      const view = new URLSearchParams(location.search).get('view') === 'reader' ? 'reader' : 'inbox';
+      const studies = [
+        ['monochrome', 'Crisp monochrome', 'Clear. Quiet. Precise.', ['#ffffff', '#dce0dc', '#2a2e2d']],
+        ['macos', 'Native macOS', 'Soft. Familiar. Refined.', ['#edf0f4', '#d2def5', '#2578e8']],
+        ['superhuman', 'Superhuman-inspired', 'Focused. Fast. After dark.', ['#141725', '#292d40', '#b9adf2']],
+        ['editorial', 'Warm editorial', 'Thoughtful. Human. Spacious.', ['#fcfaf5', '#b89c7a', '#717b61']],
+        ['material', 'Modern Material', 'Friendly. Bright. Effortless.', ['#eef3fd', '#c7ddff', '#477cd1']],
+      ];
+      document.querySelector(`nav [data-view="${view}"]`).setAttribute('aria-current', 'page');
+      for (const [index, [id, name, description, colors]] of studies.entries()) {
+        document.querySelector('main').insertAdjacentHTML('beforeend', `<article><header><span>0${index + 1}</span><div><h2>${name}</h2><p>${description}</p></div><div class="colors">${colors.map(color => `<i style="background:${color}"></i>`).join('')}</div><a href="./?style=${id}&view=${view}" aria-label="Explore ${name}">↗</a></header><a href="${id}-${view}.png"><img src="${id}-${view}.png" alt="${name} ${view === 'reader' ? 'reading view' : 'inbox'} mockup" width="1440" height="900" /></a></article>`);
+      }
+    </script>
+  </body>
+</html>
