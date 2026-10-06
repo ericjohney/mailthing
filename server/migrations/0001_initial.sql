@@ -32,19 +32,13 @@ CREATE TABLE IF NOT EXISTS messages (
     html TEXT NOT NULL,
     raw BLOB NOT NULL,
     received_at INTEGER NOT NULL,
-    is_read INTEGER NOT NULL DEFAULT 0,
-    starred INTEGER NOT NULL DEFAULT 0,
-    important INTEGER NOT NULL DEFAULT 0,
-    is_sent INTEGER NOT NULL DEFAULT 0,
-    folder TEXT NOT NULL DEFAULT 'inbox',
-    category TEXT NOT NULL DEFAULT 'primary',
+    -- Wake time for messages carrying the SNOOZED label.
     snoozed_until INTEGER
 );
 CREATE INDEX IF NOT EXISTS messages_thread ON messages(thread_id,received_at);
 CREATE INDEX IF NOT EXISTS messages_header_id ON messages(message_id);
 CREATE INDEX IF NOT EXISTS messages_thread_key ON messages(thread_key,received_at);
-CREATE INDEX IF NOT EXISTS messages_folder ON messages(folder,received_at DESC);
-CREATE INDEX IF NOT EXISTS messages_sent ON messages(is_sent,received_at DESC);
+CREATE INDEX IF NOT EXISTS messages_received ON messages(received_at DESC);
 CREATE TABLE IF NOT EXISTS attachments (
     id TEXT PRIMARY KEY,
     message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
@@ -56,14 +50,30 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS attachments_message ON attachments(message_id);
 CREATE TABLE IF NOT EXISTS labels (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    color TEXT NOT NULL DEFAULT '#2a6b53'
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    color TEXT NOT NULL DEFAULT '#2a6b53',
+    kind TEXT NOT NULL DEFAULT 'user' CHECK(kind IN ('system','user'))
 );
+-- All mailbox state is expressed as labels, as in Gmail. Archiving removes INBOX.
+INSERT INTO labels(id,name,color,kind) VALUES
+    ('INBOX','Inbox','#000000','system'),
+    ('SENT','Sent','#000000','system'),
+    ('SPAM','Spam','#000000','system'),
+    ('TRASH','Trash','#000000','system'),
+    ('UNREAD','Unread','#000000','system'),
+    ('STARRED','Starred','#000000','system'),
+    ('IMPORTANT','Important','#000000','system'),
+    ('SNOOZED','Snoozed','#000000','system'),
+    ('CATEGORY_PERSONAL','Primary','#000000','system'),
+    ('CATEGORY_PROMOTIONS','Promotions','#000000','system'),
+    ('CATEGORY_SOCIAL','Social','#000000','system'),
+    ('CATEGORY_UPDATES','Updates','#000000','system');
 CREATE TABLE IF NOT EXISTS message_labels (
     message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
     label_id TEXT NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
     PRIMARY KEY(message_id,label_id)
 );
+CREATE INDEX IF NOT EXISTS message_labels_label ON message_labels(label_id,message_id);
 CREATE TABLE IF NOT EXISTS rules (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

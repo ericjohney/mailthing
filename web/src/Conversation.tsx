@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { encodeFile, fileSize, messageDate } from './api';
 import { EmailContent } from './mailbox/EmailContent';
+import { placeLabels } from './mailbox/navigation';
 import {
   emptyDraft,
   type Conversation as ConversationData,
@@ -50,7 +51,10 @@ export function Conversation({
   const [menu, setMenu] = useState(false);
   const [labelMenu, setLabelMenu] = useState(false);
   const latest = data.messages[data.messages.length - 1];
-  const trashed = latest.folder === 'trash';
+  const trashed = latest.labels.includes('TRASH');
+  const important = data.messages.some((message) => message.labels.includes('IMPORTANT'));
+  const applied = data.labels.filter((label) => label.kind === 'user');
+  const places = placeLabels.flatMap((id) => data.labels.find((label) => label.id === id) ?? []);
   function reply(all = false, message: Message = latest) {
     const draft = emptyDraft();
     draft.to = message.sender_email === mailboxEmail ? message.recipients : message.sender_email;
@@ -135,7 +139,7 @@ export function Conversation({
                   key={label.id}
                   onClick={() => {
                     action(
-                      data.labels.some((item) => item.id === label.id) ? 'unlabel' : 'label',
+                      applied.some((item) => item.id === label.id) ? 'unlabel' : 'label',
                       label.id,
                     );
                     setLabelMenu(false);
@@ -143,7 +147,7 @@ export function Conversation({
                 >
                   <span className="label-dot" style={{ background: label.color }} />
                   {label.name}
-                  {data.labels.some((item) => item.id === label.id) && <Check size={14} />}
+                  {applied.some((item) => item.id === label.id) && <Check size={14} />}
                 </button>
               ))}
             </div>
@@ -165,11 +169,11 @@ export function Conversation({
               </button>
               <button
                 onClick={() => {
-                  action(latest.important ? 'unimportant' : 'important');
+                  action(important ? 'unimportant' : 'important');
                   setMenu(false);
                 }}
               >
-                {latest.important ? 'Mark as not important' : 'Mark as important'}
+                {important ? 'Mark as not important' : 'Mark as important'}
               </button>
               <button
                 onClick={() => {
@@ -190,10 +194,16 @@ export function Conversation({
       <div className="conversation-content">
         <div className="conversation-subject">
           <h1>{latest.subject || '(no subject)'}</h1>
-          <Badge className="folder-chip">
-            {latest.folder === 'archive' ? 'All mail' : latest.folder}
-          </Badge>
-          {data.labels.map((label) => (
+          {places.length ? (
+            places.map((label) => (
+              <Badge key={label.id} className="folder-chip">
+                {label.name}
+              </Badge>
+            ))
+          ) : (
+            <Badge className="folder-chip">All mail</Badge>
+          )}
+          {applied.map((label) => (
             <Badge key={label.id} className="label-chip">
               {label.name}
               <button
@@ -231,10 +241,10 @@ export function Conversation({
                   </button>
                   <span className="email-date">{messageDate(message.received_at)}</span>
                   <IconButton
-                    label={message.starred ? 'Unstar conversation' : 'Star conversation'}
-                    onClick={() => action(message.starred ? 'unstar' : 'star')}
+                    label={starred(message) ? 'Unstar conversation' : 'Star conversation'}
+                    onClick={() => action(starred(message) ? 'unstar' : 'star')}
                   >
-                    <Star size={18} className={message.starred ? 'star-active' : ''} />
+                    <Star size={18} className={starred(message) ? 'star-active' : ''} />
                   </IconButton>
                   {open && (
                     <IconButton label="Reply to message" onClick={() => reply(false, message)}>
@@ -334,3 +344,5 @@ export function Conversation({
     </>
   );
 }
+
+const starred = (message: Message) => message.labels.includes('STARRED');

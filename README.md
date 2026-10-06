@@ -29,6 +29,7 @@ To add an optional collection of fictional example messages to a local instance,
 
 - Threaded conversations; HTML, plain-text, original source, and downloadable attachments.
 - Inbox categories: Primary, Promotions, Social, and Updates.
+- Gmail-style labels instead of folders: a conversation can carry any number of labels, and archiving simply removes Inbox.
 - Stars, importance, read/unread, archive, snooze, Spam, Trash, and permanent deletion from Trash.
 - Custom labels and ordered filters configured in Settings.
 - Compose, reply, reply-all, forward, Cc/Bcc, attachments, and durable drafts.
@@ -41,11 +42,12 @@ Search examples:
 ```text
 from:sam@example.net subject:"weekend plans"
 is:unread has:attachment
+label:receipts category:updates
 after:2026-01-01 before:2026-02-01
 coffee in:anywhere
 ```
 
-Dates are evaluated at midnight UTC. Search excludes Spam and Trash unless `in:anywhere` or an explicit folder is included. Category assignment is a lightweight heuristic, overridden by your filters. Existing spam flags are honored; the server does not claim to perform antivirus scanning or statistical spam detection.
+Dates are evaluated at midnight UTC. Search excludes Spam and Trash unless `in:anywhere`, `in:spam`, or `in:trash` is included. `label:` matches label names case-insensitively, with hyphens standing in for spaces. Category assignment is a lightweight heuristic, overridden by your filters. Existing spam flags are honored; the server does not claim to perform antivirus scanning or statistical spam detection.
 
 The React interface uses a shared [design system](web/src/design-system/README.md). Semantic palette, typography, spacing, and control tokens live in `web/src/design-system/tokens.css`; reusable controls share hover, focus, and disabled behavior. Screen styles consume those tokens, so new palettes or density changes can share the same components. Appearance is configurable in Settings → General.
 
@@ -72,6 +74,17 @@ For your domain, point its MX record to the hostname of this server, give that h
 Set `SMTP_TLS_CERT` and `SMTP_TLS_KEY` to PEM files to advertise STARTTLS on incoming SMTP. Use your outbound relay's verified domain and SPF/DKIM setup for outbound deliverability. Mailthing provides SMTP receipt and its own web mailbox; it does not implement IMAP/POP3, direct-to-MX outbound delivery, or a complete Gmail service.
 
 The web interface defaults to localhost and has no sign-in, so anyone who can reach it can read and send mail. Do not expose `WEB_HOST` publicly without putting it behind your own access control (VPN, SSH tunnel, or an authenticating reverse proxy). Cross-site mutations are rejected, HTML is sanitized, remote email images are removed, and email HTML is rendered inside a sandboxed frame. No external fonts or trackers are loaded by the application.
+
+## Labels
+
+All mailbox state is stored as labels on individual messages, following Gmail's model. There are no folders. Built-in system labels use Gmail's ids: `INBOX`, `SENT`, `SPAM`, `TRASH`, `UNREAD`, `STARRED`, `IMPORTANT`, `SNOOZED`, and `CATEGORY_PERSONAL`/`PROMOTIONS`/`SOCIAL`/`UPDATES`. Your own labels sit alongside them. A conversation appears in every view whose label any of its messages carries.
+
+- **Archive** removes `INBOX`. **All mail** shows everything outside Spam and Trash.
+- **Trash** and **Spam** add their label and remove `INBOX`. Your own labels are kept but hidden until the conversation is moved back to the inbox.
+- **Snooze** swaps `INBOX` for `SNOOZED`, and the server adds `INBOX` back when the snooze ends.
+- Sent mail carries only `SENT`, so replying never moves a conversation.
+
+System labels can't be renamed, deleted, or shadowed by a user label with the same name.
 
 ## Storage and processing architecture
 

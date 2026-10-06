@@ -14,6 +14,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { api, encodeFile, mutate } from './api';
+import { categories, userLabels } from './mailbox/navigation';
 import type { PipelineStatus, Rule, Settings as SettingsData } from './types';
 import {
   Button,
@@ -41,6 +42,7 @@ export function Settings({
 }) {
   const [tab, setTab] = useState(initialTab);
   const [account, setAccount] = useState(settings.account);
+  const labels = userLabels(settings.labels);
   const [labelName, setLabelName] = useState('');
   const [color, setColor] = useState('#65705f');
   const [rules, setRules] = useState<Rule[]>([]);
@@ -206,7 +208,7 @@ export function Settings({
               </Button>
             </form>
             <div className="settings-list">
-              {settings.labels.map((label) => (
+              {labels.map((label) => (
                 <div key={label.id}>
                   <span className="label-dot" style={{ background: label.color }} />
                   <strong>{label.name}</strong>
@@ -220,7 +222,7 @@ export function Settings({
                   </IconButton>
                 </div>
               ))}
-              {settings.labels.length === 0 && (
+              {labels.length === 0 && (
                 <p className="muted">No labels yet. Create your first one above.</p>
               )}
             </div>
@@ -304,7 +306,7 @@ export function Settings({
                       onChange={(event) => setRule({ ...rule, value: event.target.value })}
                     >
                       <option value="">Choose label</option>
-                      {settings.labels.map((label) => (
+                      {labels.map((label) => (
                         <option key={label.id} value={label.id}>
                           {label.name}
                         </option>
@@ -320,8 +322,10 @@ export function Settings({
                       onChange={(event) => setRule({ ...rule, value: event.target.value })}
                     >
                       <option value="">Choose category</option>
-                      {['primary', 'updates', 'promotions', 'social'].map((value) => (
-                        <option key={value}>{value}</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
                       ))}
                     </select>
                   </Field>

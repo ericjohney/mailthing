@@ -41,7 +41,7 @@ async fn mailbox_search_bulk_actions_labels_and_trash() {
     let (status, page) = request(
         &app,
         "GET",
-        "/api/threads?folder=inbox&category=primary",
+        "/api/threads?label=INBOX&category=CATEGORY_PERSONAL",
         json!(null),
     )
     .await;
@@ -78,24 +78,65 @@ async fn mailbox_search_bulk_actions_labels_and_trash() {
             StatusCode::OK
         );
     }
-    let (_, page) = request(&app, "GET", "/api/threads?folder=inbox", json!(null)).await;
+    let (_, page) = request(&app, "GET", "/api/threads?label=INBOX", json!(null)).await;
     assert_eq!(page["total"], 1);
     let (_, page) = request(
         &app,
         "GET",
-        &format!(
-            "/api/threads?folder=label&label={}",
-            label["id"].as_str().unwrap()
-        ),
+        &format!("/api/threads?label={}", label["id"].as_str().unwrap()),
         json!(null),
     )
     .await;
     assert_eq!(page["total"], 1);
-    assert_eq!(page["threads"][0]["labels"], "Personal");
+    let thread_labels = page["threads"][0]["label_ids"].as_array().unwrap();
+    assert!(thread_labels.contains(&label["id"]));
+    assert!(thread_labels.contains(&json!("STARRED")));
+    assert!(!thread_labels.contains(&json!("INBOX")));
+    let (_, page) = request(&app, "GET", "/api/threads?label=ALL", json!(null)).await;
+    assert_eq!(page["total"], 2);
+    let (_, found) = request(&app, "GET", "/api/threads?q=label%3Apersonal", json!(null)).await;
+    assert_eq!(found["total"], 1);
     let (_, conversation) =
         request(&app, "GET", &format!("/api/threads/{first}"), json!(null)).await;
-    assert_eq!(conversation["messages"][0]["is_read"], true);
-    assert_eq!(conversation["messages"][0]["starred"], true);
+    let message_labels = conversation["messages"][0]["labels"].as_array().unwrap();
+    assert!(!message_labels.contains(&json!("UNREAD")));
+    assert!(message_labels.contains(&json!("STARRED")));
+    request(
+        &app,
+        "POST",
+        "/api/actions",
+        json!({"thread_ids":[first],"action":"trash"}),
+    )
+    .await;
+    // Trash hides the conversation from its labels but keeps them, as in Gmail.
+    let label_view = format!("/api/threads?label={}", label["id"].as_str().unwrap());
+    assert_eq!(
+        request(&app, "GET", &label_view, json!(null)).await.1["total"],
+        0
+    );
+    assert_eq!(
+        request(&app, "GET", "/api/threads?label=TRASH", json!(null))
+            .await
+            .1["total"],
+        1
+    );
+    request(
+        &app,
+        "POST",
+        "/api/actions",
+        json!({"thread_ids":[first],"action":"inbox"}),
+    )
+    .await;
+    assert_eq!(
+        request(&app, "GET", &label_view, json!(null)).await.1["total"],
+        1
+    );
+    assert_eq!(
+        request(&app, "GET", "/api/threads?label=INBOX", json!(null))
+            .await
+            .1["total"],
+        2
+    );
     request(
         &app,
         "POST",
@@ -172,7 +213,7 @@ async fn draft_failure_retains_content_and_mailbox_identity_is_configurable() {
         .await
         .unwrap();
     assert!(!sending);
-    let sent: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE folder='sent'")
+    let sent: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM message_labels WHERE label_id='SENT'")
         .fetch_one(&state.pool)
         .await
         .unwrap();
@@ -205,8 +246,7 @@ async fn sent_messages_remain_in_sent_when_archived_or_moved_to_inbox() {
     let (_temp, state) = setup().await;
     let raw = mail("Sent conversation", "sent-archive", "Hello");
     let mut parsed = state.pipeline.run(&raw, &envelope(), &[]).unwrap();
-    parsed.folder = "sent".into();
-    parsed.is_read = true;
+    parsed.labels = vec!["SENT".into()];
     let thread = mailthing::pipeline::persist(
         &state.pool,
         "sent-message",
@@ -228,7 +268,7 @@ async fn sent_messages_remain_in_sent_when_archived_or_moved_to_inbox() {
         )
         .await;
         assert_eq!(
-            request(&app, "GET", "/api/threads?folder=sent", json!(null))
+            request(&app, "GET", "/api/threads?label=SENT", json!(null))
                 .await
                 .1["total"],
             1
@@ -248,7 +288,7 @@ async fn sent_messages_remain_in_sent_when_archived_or_moved_to_inbox() {
     )
     .await;
     assert_eq!(
-        request(&app, "GET", "/api/threads?folder=sent", json!(null))
+        request(&app, "GET", "/api/threads?label=SENT", json!(null))
             .await
             .1["total"],
         0
@@ -270,7 +310,7 @@ async fn pagination_preserves_total_when_the_last_page_becomes_empty() {
         .await;
     }
     let app = api::router(state);
-    let (_, page) = request(&app, "GET", "/api/threads?folder=inbox&page=2", json!(null)).await;
+    let (_, page) = request(&app, "GET", "/api/threads?label=INBOX&page=2", json!(null)).await;
     assert_eq!(page["total"], 51);
     assert_eq!(page["threads"].as_array().unwrap().len(), 1);
     request(
@@ -280,7 +320,7 @@ async fn pagination_preserves_total_when_the_last_page_becomes_empty() {
         json!({"thread_ids":[page["threads"][0]["id"]],"action":"archive"}),
     )
     .await;
-    let (_, page) = request(&app, "GET", "/api/threads?folder=inbox&page=2", json!(null)).await;
+    let (_, page) = request(&app, "GET", "/api/threads?label=INBOX&page=2", json!(null)).await;
     assert_eq!(page["total"], 50);
     assert!(page["threads"].as_array().unwrap().is_empty());
 }
@@ -298,24 +338,32 @@ async fn snoozed_mail_hides_then_returns_and_invalid_filters_are_rejected() {
     )
     .await;
     assert_eq!(
-        request(&app, "GET", "/api/threads?folder=inbox", json!(null))
+        request(&app, "GET", "/api/threads?label=INBOX", json!(null))
             .await
             .1["total"],
         0
     );
     assert_eq!(
-        request(&app, "GET", "/api/threads?folder=snoozed", json!(null))
+        request(&app, "GET", "/api/threads?label=SNOOZED", json!(null))
             .await
             .1["total"],
         1
     );
+    assert_eq!(db::wake_snoozed(&state.pool).await.unwrap(), 0);
     sqlx::query("UPDATE messages SET snoozed_until=?")
         .bind(db::now() - 100)
         .execute(&state.pool)
         .await
         .unwrap();
+    assert_eq!(db::wake_snoozed(&state.pool).await.unwrap(), 1);
     assert_eq!(
-        request(&app, "GET", "/api/threads?folder=inbox", json!(null))
+        request(&app, "GET", "/api/threads?label=SNOOZED", json!(null))
+            .await
+            .1["total"],
+        0
+    );
+    assert_eq!(
+        request(&app, "GET", "/api/threads?label=INBOX", json!(null))
             .await
             .1["total"],
         1
@@ -333,6 +381,35 @@ async fn snoozed_mail_hides_then_returns_and_invalid_filters_are_rejected() {
             "POST",
             "/api/labels",
             json!({"name":"Bad","color":"#<img>!"})
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    // System labels can't be shadowed, deleted, or applied as user labels.
+    assert_eq!(
+        request(
+            &app,
+            "POST",
+            "/api/labels",
+            json!({"name":"inbox","color":"#2a6b53"})
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        request(&app, "DELETE", "/api/labels/INBOX", json!(null))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        request(
+            &app,
+            "POST",
+            "/api/actions",
+            json!({"thread_ids":[id],"action":"unlabel","value":"INBOX"})
         )
         .await
         .0,

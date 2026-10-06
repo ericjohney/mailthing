@@ -6,6 +6,8 @@ export interface Label {
   id: string;
   name: string;
   color: string;
+  /** System labels (INBOX, STARRED, CATEGORY_SOCIAL, ...) are built in. */
+  kind: 'system' | 'user';
 }
 export interface Settings {
   account: Account;
@@ -24,11 +26,9 @@ export interface Thread {
   received_at: number;
   count: number;
   unread: number;
-  starred: boolean;
-  important: boolean;
   has_attachment: boolean;
-  category: string;
-  labels: string;
+  /** Every label on any message in the conversation. */
+  label_ids: string[];
 }
 export interface Message {
   id: string;
@@ -43,12 +43,8 @@ export interface Message {
   text: string;
   html: string;
   received_at: number;
-  is_read: boolean;
-  starred: boolean;
-  important: boolean;
-  folder: string;
-  category: string;
   snoozed_until: number | null;
+  labels: string[];
 }
 export interface Attachment {
   id: string;
@@ -95,8 +91,8 @@ export interface PipelineStatus {
   failures: { id: string; error: string; received_at: number; kind: string }[];
 }
 export interface Route {
-  folder: string;
-  label?: string;
+  /** A label id, or one of the `ALL` and `DRAFTS` views. */
+  label: string;
   thread?: string;
 }
 export const emptyDraft = (): Draft => ({

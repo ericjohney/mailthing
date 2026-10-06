@@ -1,5 +1,5 @@
 use crate::{
-    AppState, db,
+    AppState, db, labels,
     models::{Account, AttachmentView, Draft, Envelope, Label, MessageView, Rule, ThreadSummary},
     outgoing, search,
 };
@@ -135,9 +135,7 @@ async fn security(request: Request, next: Next) -> Response {
 }
 async fn settings(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     let account = db::account(&state.pool).await?;
-    let labels: Vec<Label> = sqlx::query_as("SELECT * FROM labels ORDER BY name")
-        .fetch_all(&state.pool)
-        .await?;
+    let labels = all_labels(&state).await?;
     Ok(Json(
         json!({"account":account,"labels":labels,"counts":db::counts(&state.pool).await?,"outbound_configured":!state.config.relay_host.is_empty(),"smtp_port":state.config.smtp_port,"max_message_bytes":state.config.max_message_bytes}),
     ))
@@ -162,9 +160,9 @@ async fn save_account(
 
 #[derive(Deserialize, Default)]
 struct ListQuery {
-    folder: Option<String>,
-    category: Option<String>,
+    /// A label id, or `ALL` for every conversation outside spam and trash.
     label: Option<String>,
+    category: Option<String>,
     q: Option<String>,
     page: Option<i64>,
 }
@@ -180,53 +178,31 @@ async fn threads(
 ) -> ApiResult<Json<Value>> {
     let terms = search::parse(query.q.as_deref().unwrap_or_default())
         .map_err(|e| ApiError::bad(e.to_string()))?;
-    let folder = query.folder.as_deref().unwrap_or("inbox");
+    let label = query.label.as_deref().unwrap_or(labels::INBOX);
     let mut sql =
         QueryBuilder::<Sqlite>::new("WITH filtered AS (SELECT m.* FROM messages m WHERE 1=1");
     if query.q.as_ref().is_some_and(|s| !s.trim().is_empty()) {
-        if !terms
-            .iter()
-            .any(|t| matches!(t,search::Term::Field(field,_) if field=="in"))
-        {
-            sql.push(" AND m.folder NOT IN ('spam','trash')");
+        if !search::includes_hidden(&terms) {
+            sql.push(" AND ").push(labels::visible());
         }
     } else {
-        match folder {
-            "all" => {
-                sql.push(" AND m.folder NOT IN ('spam','trash')");
-            }
-            "starred" => {
-                sql.push(" AND m.starred=1 AND m.folder NOT IN ('spam','trash')");
-            }
-            "important" => {
-                sql.push(" AND m.important=1 AND m.folder NOT IN ('spam','trash')");
-            }
-            "snoozed" => {
-                sql.push(" AND m.snoozed_until > ")
-                    .push_bind(db::now())
-                    .push(" AND m.folder NOT IN ('spam','trash')");
-            }
-            "label" => {
-                sql.push(" AND m.folder NOT IN ('spam','trash')");
-            }
-            "sent" => {
-                sql.push(" AND m.is_sent=1 AND m.folder NOT IN ('spam','trash')");
-            }
-            "inbox" | "spam" | "trash" | "archive" => {
-                sql.push(" AND m.folder=").push_bind(folder.to_string());
-            }
-            _ => return Err(ApiError::bad("Unknown mailbox folder")),
+        if label != labels::SPAM && label != labels::TRASH {
+            sql.push(" AND ").push(labels::visible());
         }
-        if folder == "inbox" {
-            sql.push(" AND (m.snoozed_until IS NULL OR m.snoozed_until <= ")
-                .push_bind(db::now())
+        if label != "ALL" {
+            sql.push(" AND EXISTS(SELECT 1 FROM message_labels ml WHERE ml.message_id=m.id AND ml.label_id=")
+                .push_bind(label.to_string())
                 .push(")");
-            if let Some(category) = query.category {
-                sql.push(" AND m.category=").push_bind(category);
-            }
         }
-        if let Some(label) = query.label {
-            sql.push(" AND EXISTS(SELECT 1 FROM message_labels ml WHERE ml.message_id=m.id AND ml.label_id=").push_bind(label).push(")");
+        if label == labels::INBOX
+            && let Some(category) = query.category
+        {
+            if !labels::CATEGORIES.contains(&category.as_str()) {
+                return Err(ApiError::bad("Unknown inbox category"));
+            }
+            sql.push(" AND EXISTS(SELECT 1 FROM message_labels ml WHERE ml.message_id=m.id AND ml.label_id=")
+                .push_bind(category)
+                .push(")");
         }
     }
     search::append(&mut sql, &terms);
@@ -238,7 +214,8 @@ async fn threads(
         .unwrap_or_default();
     let mut sql =
         QueryBuilder::<Sqlite>::with_arguments(filter_sql.clone(), filter_arguments.clone());
-    sql.push("), ranked AS (SELECT m.*,ROW_NUMBER() OVER(PARTITION BY thread_id ORDER BY received_at DESC,id DESC) AS rank, COUNT(*) OVER(PARTITION BY thread_id) AS count, SUM(1-is_read) OVER(PARTITION BY thread_id) AS unread, MAX(starred) OVER(PARTITION BY thread_id) AS thread_starred, MAX(important) OVER(PARTITION BY thread_id) AS thread_important FROM filtered m) SELECT thread_id AS id,subject,sender,sender_email,snippet,received_at,count,unread,thread_starred AS starred,thread_important AS important,category,EXISTS(SELECT 1 FROM attachments a JOIN messages x ON x.id=a.message_id WHERE x.thread_id=m.thread_id) AS has_attachment,COALESCE((SELECT group_concat(DISTINCT l.name) FROM labels l JOIN message_labels ml ON ml.label_id=l.id JOIN messages x ON x.id=ml.message_id WHERE x.thread_id=m.thread_id),'') AS labels,COUNT(*) OVER() AS total FROM ranked m WHERE rank=1 ORDER BY received_at DESC LIMIT 50 OFFSET ")
+    // The row shows the newest matching message; counts and labels cover the whole conversation.
+    sql.push("), ranked AS (SELECT m.*,ROW_NUMBER() OVER(PARTITION BY thread_id ORDER BY received_at DESC,id DESC) AS rank FROM filtered m) SELECT thread_id AS id,subject,sender,sender_email,snippet,received_at,(SELECT COUNT(*) FROM messages x WHERE x.thread_id=m.thread_id) AS count,(SELECT COUNT(*) FROM messages x JOIN message_labels u ON u.message_id=x.id AND u.label_id='UNREAD' WHERE x.thread_id=m.thread_id) AS unread,EXISTS(SELECT 1 FROM attachments a JOIN messages x ON x.id=a.message_id WHERE x.thread_id=m.thread_id) AS has_attachment,(SELECT json_group_array(DISTINCT ml.label_id) FROM message_labels ml JOIN messages x ON x.id=ml.message_id WHERE x.thread_id=m.thread_id) AS label_ids,COUNT(*) OVER() AS total FROM ranked m WHERE rank=1 ORDER BY received_at DESC LIMIT 50 OFFSET ")
         .push_bind((query.page.unwrap_or(1).clamp(1,10_000)-1)*50);
     let rows = sql
         .build_query_as::<ThreadRow>()
@@ -259,7 +236,7 @@ async fn threads(
     ))
 }
 async fn thread(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
-    let messages: Vec<MessageView> = sqlx::query_as("SELECT id,thread_id,message_id,subject,sender,sender_email,recipients,cc,envelope_to,text,html,received_at,is_read,starred,important,folder,category,snoozed_until FROM messages WHERE thread_id=? ORDER BY received_at,id")
+    let messages: Vec<MessageView> = sqlx::query_as("SELECT id,thread_id,message_id,subject,sender,sender_email,recipients,cc,envelope_to,text,html,received_at,snoozed_until,(SELECT json_group_array(label_id) FROM message_labels WHERE message_id=messages.id) AS labels FROM messages WHERE thread_id=? ORDER BY received_at,id")
         .bind(&id).fetch_all(&state.pool).await?;
     if messages.is_empty() {
         return Err(ApiError::not_found());
@@ -286,75 +263,68 @@ async fn actions(
     if action.thread_ids.is_empty() || action.thread_ids.len() > 100 {
         return Err(ApiError::bad("Select between 1 and 100 conversations"));
     }
+    use labels::{IMPORTANT, INBOX, SNOOZED, SPAM, STARRED, TRASH, UNREAD};
     let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
     for id in &action.thread_ids {
-        match action.action.as_str() {
+        // Moving a conversation anywhere ends its snooze.
+        let (add, remove): (Option<&str>, &[&str]) = match action.action.as_str() {
             "label" | "unlabel" => {
-                if action.action == "label" {
-                    let exists: bool =
-                        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM labels WHERE id=?)")
-                            .bind(&action.value)
-                            .fetch_one(&mut *tx)
-                            .await?;
-                    if !exists {
-                        return Err(ApiError::bad("Label does not exist"));
-                    }
-                    sqlx::query("INSERT OR IGNORE INTO message_labels(message_id,label_id) SELECT id,? FROM messages WHERE thread_id=?").bind(&action.value).bind(id).execute(&mut *tx).await?;
-                } else {
-                    sqlx::query("DELETE FROM message_labels WHERE label_id=? AND message_id IN(SELECT id FROM messages WHERE thread_id=?)").bind(&action.value).bind(id).execute(&mut *tx).await?;
+                let exists: bool = sqlx::query_scalar(
+                    "SELECT EXISTS(SELECT 1 FROM labels WHERE id=? AND kind='user')",
+                )
+                .bind(&action.value)
+                .fetch_one(&mut *tx)
+                .await?;
+                if !exists {
+                    return Err(ApiError::bad("Label does not exist"));
                 }
+                if action.action == "label" {
+                    labels::add(&mut tx, id, &action.value).await?;
+                } else {
+                    labels::remove(&mut tx, id, &[&action.value]).await?;
+                }
+                continue;
             }
             "delete" => {
-                sqlx::query("DELETE FROM messages WHERE thread_id=? AND folder='trash'")
+                sqlx::query("DELETE FROM messages WHERE thread_id=? AND EXISTS(SELECT 1 FROM message_labels ml WHERE ml.message_id=messages.id AND ml.label_id='TRASH')")
                     .bind(id)
                     .execute(&mut *tx)
                     .await?;
+                continue;
             }
-            _ => {
-                let mut sql = QueryBuilder::<Sqlite>::new("UPDATE messages SET ");
-                match action.action.as_str() {
-                    "archive" => {
-                        sql.push("folder='archive',snoozed_until=NULL");
-                    }
-                    "trash" => {
-                        sql.push("folder='trash',snoozed_until=NULL");
-                    }
-                    "spam" => {
-                        sql.push("folder='spam',snoozed_until=NULL");
-                    }
-                    "inbox" => {
-                        sql.push("folder='inbox',snoozed_until=NULL");
-                    }
-                    "read" => {
-                        sql.push("is_read=1");
-                    }
-                    "unread" => {
-                        sql.push("is_read=0");
-                    }
-                    "star" => {
-                        sql.push("starred=1");
-                    }
-                    "unstar" => {
-                        sql.push("starred=0");
-                    }
-                    "important" => {
-                        sql.push("important=1");
-                    }
-                    "unimportant" => {
-                        sql.push("important=0");
-                    }
-                    "snooze" => {
-                        let until = action
-                            .until
-                            .filter(|v| *v > db::now())
-                            .ok_or_else(|| ApiError::bad("Choose a future snooze time"))?;
-                        sql.push("snoozed_until=").push_bind(until);
-                    }
-                    _ => return Err(ApiError::bad("Unknown mailbox action")),
-                }
-                sql.push(" WHERE thread_id=").push_bind(id.clone());
-                sql.build().execute(&mut *tx).await?;
+            "snooze" => {
+                let until = action
+                    .until
+                    .filter(|v| *v > db::now())
+                    .ok_or_else(|| ApiError::bad("Choose a future snooze time"))?;
+                sqlx::query("UPDATE messages SET snoozed_until=? WHERE thread_id=?")
+                    .bind(until)
+                    .bind(id)
+                    .execute(&mut *tx)
+                    .await?;
+                (Some(SNOOZED), &[INBOX])
             }
+            "archive" => (None, &[INBOX, SNOOZED]),
+            "trash" => (Some(TRASH), &[INBOX, SPAM, SNOOZED]),
+            "spam" => (Some(SPAM), &[INBOX, TRASH, SNOOZED]),
+            "inbox" => (Some(INBOX), &[SPAM, TRASH, SNOOZED]),
+            "read" => (None, &[UNREAD]),
+            "unread" => (Some(UNREAD), &[]),
+            "star" => (Some(STARRED), &[]),
+            "unstar" => (None, &[STARRED]),
+            "important" => (Some(IMPORTANT), &[]),
+            "unimportant" => (None, &[IMPORTANT]),
+            _ => return Err(ApiError::bad("Unknown mailbox action")),
+        };
+        if remove.contains(&SNOOZED) {
+            sqlx::query("UPDATE messages SET snoozed_until=NULL WHERE thread_id=?")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        labels::remove(&mut tx, id, remove).await?;
+        if let Some(label) = add {
+            labels::add(&mut tx, id, label).await?;
         }
     }
     tx.commit().await?;
@@ -362,12 +332,15 @@ async fn actions(
     Ok(Json(json!({"ok":true})))
 }
 
-async fn labels(State(state): State<AppState>) -> ApiResult<Json<Vec<Label>>> {
-    Ok(Json(
-        sqlx::query_as("SELECT * FROM labels ORDER BY name")
+async fn all_labels(state: &AppState) -> anyhow::Result<Vec<Label>> {
+    Ok(
+        sqlx::query_as("SELECT id,name,color,kind FROM labels ORDER BY kind,name")
             .fetch_all(&state.pool)
             .await?,
-    ))
+    )
+}
+async fn labels(State(state): State<AppState>) -> ApiResult<Json<Vec<Label>>> {
+    Ok(Json(all_labels(&state).await?))
 }
 #[derive(Deserialize)]
 struct LabelInput {
@@ -390,8 +363,9 @@ async fn create_label(
         id: uuid::Uuid::new_v4().to_string(),
         name: input.name.trim().into(),
         color: input.color,
+        kind: "user".into(),
     };
-    let result = sqlx::query("INSERT INTO labels(id,name,color) VALUES(?,?,?)")
+    let result = sqlx::query("INSERT INTO labels(id,name,color,kind) VALUES(?,?,?,'user')")
         .bind(&label.id)
         .bind(&label.name)
         .bind(&label.color)
@@ -402,6 +376,7 @@ async fn create_label(
             .as_database_error()
             .is_some_and(|e| e.is_unique_violation())
         {
+            // Names are unique case-insensitively, including system labels such as Inbox.
             return Err(ApiError::bad("A label with this name already exists"));
         }
         return Err(error.into());
@@ -412,10 +387,13 @@ async fn delete_label(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
-    sqlx::query("DELETE FROM labels WHERE id=?")
+    let deleted = sqlx::query("DELETE FROM labels WHERE id=? AND kind='user'")
         .bind(&id)
         .execute(&state.pool)
         .await?;
+    if deleted.rows_affected() == 0 {
+        return Err(ApiError::bad("Only your own labels can be deleted"));
+    }
     sqlx::query("DELETE FROM rules WHERE action='label' AND value=?")
         .bind(&id)
         .execute(&state.pool)
@@ -453,16 +431,15 @@ async fn save_rule(
             "Enter a rule name, condition, and supported action",
         ));
     }
-    if rule.action == "category"
-        && !["primary", "updates", "promotions", "social"].contains(&rule.value.as_str())
-    {
+    if rule.action == "category" && !labels::CATEGORIES.contains(&rule.value.as_str()) {
         return Err(ApiError::bad("Choose a valid category"));
     }
     if rule.action == "label" {
-        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM labels WHERE id=?)")
-            .bind(&rule.value)
-            .fetch_one(&state.pool)
-            .await?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM labels WHERE id=? AND kind='user')")
+                .bind(&rule.value)
+                .fetch_one(&state.pool)
+                .await?;
         if !exists {
             return Err(ApiError::bad("Choose an existing label"));
         }

@@ -17,6 +17,8 @@ pub struct Label {
     pub id: String,
     pub name: String,
     pub color: String,
+    /// `system` labels (INBOX, STARRED, ...) are built in; `user` labels are created in Settings.
+    pub kind: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -69,11 +71,10 @@ pub struct ThreadSummary {
     pub received_at: i64,
     pub count: i64,
     pub unread: i64,
-    pub starred: bool,
-    pub important: bool,
     pub has_attachment: bool,
-    pub category: String,
-    pub labels: String,
+    /// Every label on any message in the conversation.
+    #[sqlx(json)]
+    pub label_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -90,12 +91,9 @@ pub struct MessageView {
     pub text: String,
     pub html: String,
     pub received_at: i64,
-    pub is_read: bool,
-    pub starred: bool,
-    pub important: bool,
-    pub folder: String,
-    pub category: String,
     pub snoozed_until: Option<i64>,
+    #[sqlx(json)]
+    pub labels: Vec<String>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]

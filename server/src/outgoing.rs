@@ -1,5 +1,5 @@
 use crate::{
-    AppState, db,
+    AppState, db, labels,
     models::{Draft, Envelope},
     pipeline,
 };
@@ -97,8 +97,8 @@ pub async fn send(state: &AppState, draft: &Draft) -> Result<String> {
             .collect(),
     };
     let mut parsed = state.pipeline.run(&raw, &envelope, &[])?;
-    parsed.folder = "sent".into();
-    parsed.is_read = true;
+    // Sent mail carries only SENT; the conversation stays wherever its other messages are.
+    parsed.labels = vec![labels::SENT.into()];
     // Persist a raw receipt before the network call. A crash after relay acceptance is
     // visible as an ambiguous outgoing receipt rather than automatically resent.
     let id = uuid::Uuid::new_v4().to_string();

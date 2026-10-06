@@ -49,7 +49,7 @@ fn rules_override_categories_in_order_and_match_envelope_recipients() {
             field: "to".into(),
             contains: "ALEX@EXAMPLE.COM".into(),
             action: "category".into(),
-            value: "primary".into(),
+            value: "CATEGORY_PERSONAL".into(),
             enabled: true,
         },
         Rule {
@@ -65,9 +65,12 @@ fn rules_override_categories_in_order_and_match_envelope_recipients() {
     let mail = Pipeline::default()
         .run(&mail("Your invoice", "1", "Thanks"), &envelope(), &rules)
         .unwrap();
-    assert_eq!(mail.category, "primary");
-    assert_eq!(mail.labels, vec!["finance"]);
-    assert_eq!(mail.folder, "inbox");
+    // "invoice" alone would categorize as Updates; the rule moves it to Primary.
+    assert_eq!(mail.category(), Some("CATEGORY_PERSONAL"));
+    assert!(mail.has_label("finance"));
+    assert!(mail.has_label("INBOX"));
+    assert!(mail.has_label("UNREAD"));
+    assert!(!mail.has_label("CATEGORY_UPDATES"));
     assert_eq!(pipeline::normalize_subject(" Re: Fwd: RE: Hello "), "hello");
 }
 

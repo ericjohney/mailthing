@@ -1,22 +1,28 @@
 import { Archive, Mail, Paperclip, Star, Trash2 } from 'lucide-react';
 import { messageDate } from '../api';
 import { Badge, IconButton } from '../design-system';
-import type { Thread } from '../types';
+import type { Label, Thread } from '../types';
 
 export function ThreadRow({
   thread,
+  labels,
   selected,
   onSelect,
   onOpen,
   onAction,
 }: {
   thread: Thread;
+  /** User labels, used to name the ids on the conversation. */
+  labels: Label[];
   selected: boolean;
   onSelect: () => void;
   onOpen: () => void;
   onAction: (name: string, id: string) => void;
 }) {
   const subject = thread.subject || '(no subject)';
+  const starred = thread.label_ids.includes('STARRED');
+  const important = thread.label_ids.includes('IMPORTANT');
+  const threadLabels = labels.filter((label) => thread.label_ids.includes(label.id));
   return (
     <div className={`message-row ${thread.unread ? 'unread' : ''} ${selected ? 'selected' : ''}`}>
       <input
@@ -27,12 +33,12 @@ export function ThreadRow({
       />
       <button
         className="row-star"
-        title={thread.starred ? 'Remove star' : 'Add star'}
-        aria-label={`${thread.starred ? 'Unstar' : 'Star'} ${subject}`}
-        aria-pressed={thread.starred}
-        onClick={() => onAction(thread.starred ? 'unstar' : 'star', thread.id)}
+        title={starred ? 'Remove star' : 'Add star'}
+        aria-label={`${starred ? 'Unstar' : 'Star'} ${subject}`}
+        aria-pressed={starred}
+        onClick={() => onAction(starred ? 'unstar' : 'star', thread.id)}
       >
-        <Star size={16} className={thread.starred ? 'star-active' : ''} />
+        <Star size={16} className={starred ? 'star-active' : ''} />
       </button>
       <button className="row-main" onClick={onOpen}>
         <span className="row-sender">
@@ -40,17 +46,16 @@ export function ThreadRow({
           {thread.count > 1 && <small>{thread.count}</small>}
         </span>
         <span className="row-content">
-          {thread.important && (
+          {important && (
             <span className="important-marker" title="Important">
               ›
             </span>
           )}
-          {thread.labels &&
-            thread.labels.split(',').map((label) => (
-              <Badge key={label} className="row-label">
-                {label}
-              </Badge>
-            ))}
+          {threadLabels.map((label) => (
+            <Badge key={label.id} className="row-label">
+              {label.name}
+            </Badge>
+          ))}
           <strong>{subject}</strong>
           <span className="snippet"> — {thread.snippet}</span>
         </span>
