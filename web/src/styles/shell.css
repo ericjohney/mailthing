@@ -47,16 +47,6 @@
   font-weight: var(--font-weight-normal);
   margin-top: 6px;
 }
-.brand-mark {
-  background: var(--color-action);
-  color: var(--color-on-action);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-}
 .search-wrap {
   position: relative;
   flex: 1;

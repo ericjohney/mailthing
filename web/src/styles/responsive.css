@@ -515,11 +515,4 @@
   .help-content {
     padding: 0 var(--space-5) var(--space-5);
   }
-  .login-screen {
-    padding: var(--space-4);
-  }
-  .login-card {
-    padding: var(--space-8);
-    max-width: 100%;
-  }
 }

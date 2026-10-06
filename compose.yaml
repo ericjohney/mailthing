@@ -7,7 +7,6 @@ services:
       WEB_HOST: 0.0.0.0
       SMTP_HOST: 0.0.0.0
       DATABASE_URL: sqlite:///app/data/mailthing.db
-      APP_PASSWORD: ${APP_PASSWORD:?Set APP_PASSWORD in .env before running Docker}
     ports:
       - "127.0.0.1:9005:9005"
       - "2500:2500"

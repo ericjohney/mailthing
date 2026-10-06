@@ -12,7 +12,6 @@ const settings: Settings = {
   outbound_configured: false,
   smtp_port: 2500,
   max_message_bytes: 26214400,
-  password_required: false,
 };
 const thread: Thread = {
   id: 'thread-1',
@@ -42,8 +41,7 @@ beforeEach(() => {
       const body = init?.body ? JSON.parse(String(init.body)) : undefined;
       calls.push({ path, method, body });
       let data: any = {};
-      if (path === '/api/session') data = { authenticated: true };
-      else if (path === '/api/settings') data = method === 'PUT' ? body : settings;
+      if (path === '/api/settings') data = method === 'PUT' ? body : settings;
       else if (path.startsWith('/api/threads?')) data = { threads: mailbox, total: mailbox.length };
       else if (path === '/api/actions') {
         if (body.action === 'archive') mailbox = [];

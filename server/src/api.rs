@@ -6,7 +6,7 @@ use crate::{
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Path, Query, Request, State},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{
         IntoResponse, Response, Sse,
@@ -17,10 +17,8 @@ use axum::{
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use sqlx::{Execute, QueryBuilder, Row, Sqlite};
 use std::{convert::Infallible, time::Duration};
-use subtle::ConstantTimeEq;
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
@@ -75,13 +73,11 @@ pub fn router(state: AppState) -> Router {
                 StatusCode::NOT_FOUND,
                 Json(json!({"error":"Unknown API route"})),
             )
-        })
-        .route_layer(middleware::from_fn_with_state(state.clone(), authorize));
+        });
     let assets = ServeDir::new(&state.config.assets)
         .not_found_service(ServeFile::new(state.config.assets.join("index.html")));
     Router::new()
         .nest("/api", api)
-        .route("/api/session", get(session).post(login).delete(logout))
         .route("/health", get(|| async { Json(json!({"status":"ok"})) }))
         .fallback_service(assets)
         .layer(DefaultBodyLimit::max(state.config.max_message_bytes * 2))
@@ -90,35 +86,6 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
-fn session_cookie(headers: &HeaderMap) -> Option<&str> {
-    headers
-        .get(header::COOKIE)?
-        .to_str()
-        .ok()?
-        .split(';')
-        .find_map(|part| part.trim().strip_prefix("mailthing_session="))
-}
-async fn authenticated(state: &AppState, headers: &HeaderMap) -> bool {
-    if state.config.password.is_empty() {
-        return true;
-    }
-    let Some(token) = session_cookie(headers) else {
-        return false;
-    };
-    let mut sessions = state.sessions.lock().await;
-    sessions.retain(|_, expires| *expires > std::time::Instant::now());
-    sessions.contains_key(token)
-}
-async fn authorize(State(state): State<AppState>, request: Request, next: Next) -> Response {
-    if !authenticated(&state, request.headers()).await {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({"error":"Sign in to your mailbox"})),
-        )
-            .into_response();
-    }
-    next.run(request).await
-}
 async fn security(request: Request, next: Next) -> Response {
     if !matches!(
         *request.method(),
@@ -166,77 +133,13 @@ async fn security(request: Request, next: Next) -> Response {
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response
 }
-async fn session(State(state): State<AppState>, headers: HeaderMap) -> Json<Value> {
-    Json(
-        json!({"authenticated":authenticated(&state,&headers).await,"password_required":!state.config.password.is_empty()}),
-    )
-}
-#[derive(Deserialize)]
-struct Login {
-    password: String,
-}
-async fn login(State(state): State<AppState>, Json(input): Json<Login>) -> ApiResult<Response> {
-    let mut attempts = state.login_attempts.lock().await;
-    if attempts.1.elapsed() >= Duration::from_secs(60) {
-        *attempts = (0, std::time::Instant::now());
-    }
-    if attempts.0 >= 10 {
-        return Err(ApiError(
-            StatusCode::TOO_MANY_REQUESTS,
-            "Too many attempts. Try again in a minute.".into(),
-        ));
-    }
-    attempts.0 += 1;
-    if !bool::from(
-        Sha256::digest(input.password.as_bytes())
-            .ct_eq(&Sha256::digest(state.config.password.as_bytes())),
-    ) {
-        return Err(ApiError(
-            StatusCode::UNAUTHORIZED,
-            "Incorrect password".into(),
-        ));
-    }
-    let token = format!("{}{}", uuid::Uuid::new_v4(), uuid::Uuid::new_v4());
-    state.sessions.lock().await.insert(
-        token.clone(),
-        std::time::Instant::now() + Duration::from_secs(28800),
-    );
-    let cookie = format!(
-        "mailthing_session={}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800{}",
-        token,
-        if state.config.cookie_secure {
-            "; Secure"
-        } else {
-            ""
-        }
-    );
-    Ok((
-        [(header::SET_COOKIE, cookie)],
-        Json(json!({"authenticated":true})),
-    )
-        .into_response())
-}
-async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
-    if let Some(token) = session_cookie(&headers) {
-        state.sessions.lock().await.remove(token);
-    }
-    (
-        [(
-            header::SET_COOKIE,
-            "mailthing_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
-        )],
-        Json(json!({"authenticated":false})),
-    )
-        .into_response()
-}
-
 async fn settings(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     let account = db::account(&state.pool).await?;
     let labels: Vec<Label> = sqlx::query_as("SELECT * FROM labels ORDER BY name")
         .fetch_all(&state.pool)
         .await?;
     Ok(Json(
-        json!({"account":account,"labels":labels,"counts":db::counts(&state.pool).await?,"outbound_configured":!state.config.relay_host.is_empty(),"smtp_port":state.config.smtp_port,"max_message_bytes":state.config.max_message_bytes,"password_required":!state.config.password.is_empty()}),
+        json!({"account":account,"labels":labels,"counts":db::counts(&state.pool).await?,"outbound_configured":!state.config.relay_host.is_empty(),"smtp_port":state.config.smtp_port,"max_message_bytes":state.config.max_message_bytes}),
     ))
 }
 async fn save_account(

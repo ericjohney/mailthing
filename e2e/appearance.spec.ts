@@ -19,8 +19,6 @@ test('shares accessible palettes across the inbox, reader, compose, and persiste
   page,
 }) => {
   await page.goto('/');
-  await page.getByLabel('Mailbox password').fill('browser-test-password');
-  await page.getByRole('button', { name: 'Open mailbox' }).click();
   await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
   const subject = 'A formatted note for the design system';
   const raw = `From: Nora Chen <nora@example.net>\r\nTo: Alex <alex@example.com>\r\nSubject: ${subject}\r\nMessage-ID: <appearance-test@example.net>\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<p>A readable note in every appearance.</p><a href="https://example.com">A link</a>\r\n`;

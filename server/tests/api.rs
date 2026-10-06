@@ -6,7 +6,7 @@ use axum::{
 };
 use common::*;
 use http_body_util::BodyExt;
-use mailthing::{AppState, api, db};
+use mailthing::{api, db};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
@@ -180,62 +180,14 @@ async fn draft_failure_retains_content_and_mailbox_identity_is_configurable() {
 }
 
 #[tokio::test]
-async fn private_api_requires_login_and_rejects_cross_site_mutations() {
+async fn rejects_cross_site_mutations() {
     let (_temp, state) = setup().await;
-    let mut config = (*state.config).clone();
-    config.password = "correct horse battery".into();
-    let private = AppState::new(state.pool, config);
-    let app = api::router(private.clone());
-    assert_eq!(
-        request(&app, "GET", "/api/settings", json!(null)).await.0,
-        StatusCode::UNAUTHORIZED
-    );
-    assert_eq!(
-        request(&app, "POST", "/api/session", json!({"password":"wrong"}))
-            .await
-            .0,
-        StatusCode::UNAUTHORIZED
-    );
+    let app = api::router(state);
     let response = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/session")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    json!({"password":"correct horse battery"}).to_string(),
-                ))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let cookie = response.headers()["set-cookie"]
-        .to_str()
-        .unwrap()
-        .to_string();
-    assert!(cookie.contains("HttpOnly"));
-    assert!(cookie.contains("SameSite=Strict"));
-    let response = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .uri("/api/settings")
-                .header("cookie", &cookie)
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let response = app
-        .clone()
         .oneshot(
             Request::builder()
                 .method("PUT")
                 .uri("/api/settings")
-                .header("cookie", &cookie)
                 .header("sec-fetch-site", "cross-site")
                 .header("content-type", "application/json")
                 .body(Body::from(
@@ -246,30 +198,6 @@ async fn private_api_requires_login_and_rejects_cross_site_mutations() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    let response = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("DELETE")
-                .uri("/api/session")
-                .header("cookie", &cookie)
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/api/settings")
-                .header("cookie", &cookie)
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]

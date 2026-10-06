@@ -14,7 +14,6 @@ export interface Settings {
   outbound_configured: boolean;
   smtp_port: number;
   max_message_bytes: number;
-  password_required: boolean;
 }
 export interface Thread {
   id: string;

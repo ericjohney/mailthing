@@ -9,7 +9,7 @@ pub mod smtp;
 
 use config::Config;
 use sqlx::SqlitePool;
-use std::{collections::HashMap, sync::Arc, time::Instant};
+use std::sync::Arc;
 use tokio::sync::{Notify, broadcast, watch};
 
 #[derive(Clone)]
@@ -18,9 +18,7 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub wake: Arc<Notify>,
     pub events: broadcast::Sender<()>,
-    pub sessions: Arc<tokio::sync::Mutex<HashMap<String, Instant>>>,
     pub pipeline: Arc<pipeline::Pipeline>,
-    pub login_attempts: Arc<tokio::sync::Mutex<(u32, std::time::Instant)>>,
     pub shutdown: watch::Sender<bool>,
 }
 
@@ -31,9 +29,7 @@ impl AppState {
             config: Arc::new(config),
             wake: Arc::new(Notify::new()),
             events: broadcast::channel(64).0,
-            sessions: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             pipeline: Arc::new(pipeline::Pipeline::default()),
-            login_attempts: Arc::new(tokio::sync::Mutex::new((0, std::time::Instant::now()))),
             shutdown: watch::channel(false).0,
         }
     }

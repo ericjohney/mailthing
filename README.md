@@ -33,7 +33,7 @@ To add an optional collection of fictional example messages to a local instance,
 - Custom labels and ordered filters configured in Settings.
 - Compose, reply, reply-all, forward, Cc/Bcc, attachments, and durable drafts.
 - Full-text search, bulk actions, pagination, live updates, keyboard shortcuts, and mobile layouts.
-- Crisp monochrome appearance with light, dark, and device-following themes; password sign-in when configured.
+- Crisp monochrome appearance with light, dark, and device-following themes.
 - `.eml` import and a live processing dashboard with failed-receipt retry.
 
 Search examples:
@@ -71,7 +71,7 @@ For your domain, point its MX record to the hostname of this server, give that h
 
 Set `SMTP_TLS_CERT` and `SMTP_TLS_KEY` to PEM files to advertise STARTTLS on incoming SMTP. Use your outbound relay's verified domain and SPF/DKIM setup for outbound deliverability. Mailthing provides SMTP receipt and its own web mailbox; it does not implement IMAP/POP3, direct-to-MX outbound delivery, or a complete Gmail service.
 
-The web interface defaults to localhost. Set `APP_PASSWORD` before binding `WEB_HOST` to a public address; the server enforces this requirement. Place a public web deployment behind HTTPS and set `COOKIE_SECURE=true`. Sessions use HttpOnly, SameSite cookies, cross-site mutations are rejected, HTML is sanitized, remote email images are removed, and email HTML is rendered inside a sandboxed frame. No external fonts or trackers are loaded by the application.
+The web interface defaults to localhost and has no sign-in, so anyone who can reach it can read and send mail. Do not expose `WEB_HOST` publicly without putting it behind your own access control (VPN, SSH tunnel, or an authenticating reverse proxy). Cross-site mutations are rejected, HTML is sanitized, remote email images are removed, and email HTML is rendered inside a sandboxed frame. No external fonts or trackers are loaded by the application.
 
 ## Storage and processing architecture
 
@@ -105,7 +105,7 @@ cargo build --locked --release
 ./target/release/mailthing
 ```
 
-Or set `APP_PASSWORD` in `.env`, then:
+Or with Docker:
 
 ```sh
 docker compose up --build -d
@@ -121,10 +121,10 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-`npm run check` builds/types-checks the web app, runs React interaction tests, checks Rust formatting and Clippy, and runs Rust integration tests. Server tests use isolated temporary databases and local SMTP sockets. They cover MIME decoding, HTML safety, attachments, filters, threading, recovery, idempotent persistence, burst concurrency, SMTP catch-all receipt and size limits, authenticated API access, cross-site mutation rejection, search, snooze, bulk actions, draft retention, and outbound delivery with attachments and Bcc.
+`npm run check` builds/types-checks the web app, runs React interaction tests, checks Rust formatting and Clippy, and runs Rust integration tests. Server tests use isolated temporary databases and local SMTP sockets. They cover MIME decoding, HTML safety, attachments, filters, threading, recovery, idempotent persistence, burst concurrency, SMTP catch-all receipt and size limits, cross-site mutation rejection, search, snooze, bulk actions, draft retention, and outbound delivery with attachments and Bcc.
 
 The browser test starts its own Rust server and temporary database. It covers sign-in, pipeline import/live arrival, starring, reading/replying, saved drafts, archive/search, configuration, and a mobile compose view. GitHub Actions runs all checks.
 
 ## Configuration reference
 
-See **`.env.example`** for every supported setting. Mailbox identity, labels, and filters are stored in SQLite and editable in the app. Server binding, storage location, authentication, TLS, relay credentials, worker count, and message limits are environment configuration.
+See **`.env.example`** for every supported setting. Mailbox identity, labels, and filters are stored in SQLite and editable in the app. Server binding, storage location, TLS, relay credentials, worker count, and message limits are environment configuration.

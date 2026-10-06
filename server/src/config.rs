@@ -8,8 +8,6 @@ pub struct Config {
     pub smtp_host: IpAddr,
     pub smtp_port: u16,
     pub database_url: String,
-    pub password: String,
-    pub cookie_secure: bool,
     pub mailbox_name: String,
     pub mailbox_email: String,
     pub relay_host: String,
@@ -38,8 +36,6 @@ impl Config {
             smtp_host: get("SMTP_HOST", "0.0.0.0").parse()?,
             smtp_port: get("SMTP_PORT", "2500").parse()?,
             database_url: get("DATABASE_URL", "sqlite://data/mailthing.db"),
-            password: get("APP_PASSWORD", ""),
-            cookie_secure: get("COOKIE_SECURE", "false").parse()?,
             mailbox_name: get("MAILBOX_NAME", "My mailbox"),
             mailbox_email: get("MAILBOX_EMAIL", "me@mailthing.local"),
             relay_host: get("SMTP_RELAY_HOST", ""),
@@ -64,10 +60,6 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<()> {
-        ensure!(
-            self.web_host.is_loopback() || !self.password.is_empty(),
-            "APP_PASSWORD is required when WEB_HOST is not loopback"
-        );
         ensure!(
             (1..=32).contains(&self.concurrency),
             "PIPELINE_CONCURRENCY must be between 1 and 32"

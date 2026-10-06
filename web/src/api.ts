@@ -13,10 +13,8 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     headers: { 'Content-Type': 'application/json', ...options.headers },
   });
   const data = await response.json();
-  if (!response.ok) {
-    if (response.status === 401) window.dispatchEvent(new Event('mailthing:unauthorized'));
+  if (!response.ok)
     throw new ApiError(data.error || 'Something went wrong. Please try again.', response.status);
-  }
   return data as T;
 }
 export function mutate<T>(path: string, body: unknown, method = 'POST') {

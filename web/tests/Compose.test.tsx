@@ -13,7 +13,6 @@ it('retains the compose window and draft when sending fails', async () => {
     outbound_configured: true,
     smtp_port: 2500,
     max_message_bytes: 26214400,
-    password_required: false,
   };
   const onClose = vi.fn();
   const report = vi.fn();

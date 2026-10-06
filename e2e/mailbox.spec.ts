@@ -6,8 +6,6 @@ test('receives mail through the pipeline, supports mailbox actions, and works on
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await page.getByLabel('Mailbox password').fill('browser-test-password');
-  await page.getByRole('button', { name: 'Open mailbox' }).click();
   await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
   const raw =
     'From: Sam Rivera <sam@example.net>\r\nTo: Alex Morgan <alex@example.com>\r\nSubject: A note for the weekend\r\nMessage-ID: <browser-test@example.net>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nCoffee by the river on Saturday?\r\n';

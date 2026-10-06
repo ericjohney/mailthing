@@ -10,8 +10,6 @@ pub async fn setup() -> (TempDir, AppState) {
         smtp_host: "127.0.0.1".parse().unwrap(),
         smtp_port: 0,
         database_url: format!("sqlite://{}", temp.path().join("mail.db").display()),
-        password: String::new(),
-        cookie_secure: false,
         mailbox_name: "Alex Morgan".into(),
         mailbox_email: "alex@example.com".into(),
         relay_host: String::new(),

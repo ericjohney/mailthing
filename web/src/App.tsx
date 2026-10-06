@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity,
   Archive,
-  ArrowDown,
   ArrowLeft,
   Check,
   CheckCheck,
@@ -66,8 +65,6 @@ function getRoute(): Route {
 }
 
 export function App() {
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  const [password, setPassword] = useState('');
   const [settings, setSettings] = useState<SettingsData>();
   const [route, setRoute] = useState(getRoute);
   const [query, setQuery] = useState('');
@@ -118,22 +115,13 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    api<{ authenticated: boolean }>('/session')
-      .then((data) => setAuthenticated(data.authenticated))
-      .catch((error) => {
-        setLoadError(error.message);
-        setAuthenticated(false);
-      });
-    const unauthorized = () => setAuthenticated(false);
     const hash = () => {
       setRoute(getRoute());
       setSelected(new Set());
       setPage(1);
     };
-    window.addEventListener('mailthing:unauthorized', unauthorized);
     window.addEventListener('hashchange', hash);
     return () => {
-      window.removeEventListener('mailthing:unauthorized', unauthorized);
       window.removeEventListener('hashchange', hash);
     };
   }, []);
@@ -152,13 +140,11 @@ export function App() {
     return () => clearTimeout(timer);
   }, [toast]);
   useEffect(() => {
-    if (!authenticated) return;
     api<SettingsData>('/settings')
       .then(setSettings)
       .catch((error) => report(error.message));
-  }, [authenticated, tick, report]);
+  }, [tick, report]);
   useEffect(() => {
-    if (!authenticated) return;
     const events = new EventSource('/api/events');
     events.addEventListener('mailbox', refresh);
     events.onopen = () => {
@@ -171,9 +157,9 @@ export function App() {
       events.close();
       clearInterval(timer);
     };
-  }, [authenticated, refresh]);
+  }, [refresh]);
   useEffect(() => {
-    if (!authenticated || route.thread) return;
+    if (route.thread) return;
     let cancelled = false;
     setLoading(true);
     setLoadError('');
@@ -218,9 +204,9 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [authenticated, route.folder, route.label, route.thread, category, searchQuery, page, tick]);
+  }, [route.folder, route.label, route.thread, category, searchQuery, page, tick]);
   useEffect(() => {
-    if (!authenticated || !route.thread) {
+    if (!route.thread) {
       setConversation(undefined);
       return;
     }
@@ -245,7 +231,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [authenticated, route.thread, tick, refresh, report]);
+  }, [route.thread, tick, refresh, report]);
   async function doAction(
     name: string,
     ids = route.thread ? [route.thread] : [...selected],
@@ -303,7 +289,7 @@ export function App() {
         event.preventDefault();
         searchInput.current?.focus();
       }
-      if (compose || settingsTab || !authenticated) return;
+      if (compose || settingsTab) return;
       if (event.key === 'c') setCompose(emptyDraft());
       if (event.key === 'e') doAction('archive');
       if (event.key === '#') doAction('trash');
@@ -333,69 +319,6 @@ export function App() {
   const isDrafts = route.folder === 'drafts' && !searchQuery;
   const showCategories = route.folder === 'inbox' && !route.thread && !searchQuery;
 
-  if (authenticated === null)
-    return (
-      <div className="boot-screen">
-        <div className="brand-mark">
-          <Mail size={26} />
-        </div>
-        <LoaderCircle size={22} className="spin" />
-        <span>Opening your mailbox…</span>
-      </div>
-    );
-  if (!authenticated)
-    return (
-      <div className="login-screen">
-        <div className="login-card">
-          <div className="brand-mark">
-            <Mail size={27} />
-          </div>
-          <span className="eyebrow">MAILTHING</span>
-          <h1>
-            Your mail.
-            <br />
-            Your space.
-          </h1>
-          <p>Sign in to your personal mailbox.</p>
-          <form
-            onSubmit={async (event) => {
-              event.preventDefault();
-              setBusy(true);
-              try {
-                await mutate('/session', { password });
-                setAuthenticated(true);
-                setPassword('');
-                setLoadError('');
-              } catch (error) {
-                setLoadError((error as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <Field label="Mailbox password">
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                required
-                autoFocus
-              />
-            </Field>
-            {loadError && (
-              <p role="alert" className="error-text">
-                {loadError}
-              </p>
-            )}
-            <Button variant="primary" type="submit" disabled={busy}>
-              {busy && <LoaderCircle size={17} className="spin" />}Open mailbox
-              <ArrowDown size={17} />
-            </Button>
-          </form>
-        </div>
-      </div>
-    );
   if (!settings)
     return (
       <div className="boot-screen">
@@ -1009,18 +932,6 @@ export function App() {
               Search supports from:, to:, subject:, is:unread, is:starred, has:attachment, before:
               and after: dates, and in:anywhere.
             </p>
-            {settings.password_required && (
-              <Button
-                variant="secondary"
-                onClick={async () => {
-                  await api('/session', { method: 'DELETE' });
-                  setAuthenticated(false);
-                  setHelp(false);
-                }}
-              >
-                Sign out
-              </Button>
-            )}
           </div>
         </Modal>
       )}
