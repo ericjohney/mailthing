@@ -2,7 +2,7 @@
 //! Stages are pure, synchronous transformations executed on Tokio's blocking pool.
 use crate::{
     db, labels,
-    models::{Envelope, Rule},
+    models::{Envelope, ImportState, Rule},
 };
 use anyhow::{Context, Result};
 use mailparse::{MailHeaderMap, ParsedMail};
@@ -354,6 +354,22 @@ impl Stage for RulesStage {
     }
 }
 
+/// Imported state overrides the pipeline's defaults and filters, as the source mailbox
+/// already reflects the owner's decisions. Filter labels and the category are kept.
+pub fn apply_import_state(mail: &mut ProcessedMail, state: &ImportState) {
+    if let Some(system) = &state.system_labels {
+        for label in labels::STATE {
+            mail.remove_label(label);
+        }
+        for label in system {
+            mail.add_label(label);
+        }
+    }
+    for label in &state.label_ids {
+        mail.add_label(label);
+    }
+}
+
 /// Message insertion and job completion are atomic: a retry cannot duplicate a receipt.
 pub async fn persist(
     pool: &SqlitePool,
@@ -378,8 +394,9 @@ pub async fn persist(
         }
     }
     if thread_id.is_none() && !mail.normalized_subject.is_empty() {
-        thread_id = sqlx::query_scalar("SELECT thread_id FROM messages WHERE thread_key=? AND received_at>? ORDER BY received_at DESC LIMIT 1")
-            .bind(&mail.thread_key).bind(received_at - 30 * 86_400_000).fetch_optional(&mut *tx).await?;
+        // Bounded on both sides so an imported older message never joins a newer conversation.
+        thread_id = sqlx::query_scalar("SELECT thread_id FROM messages WHERE thread_key=? AND received_at>? AND received_at<? ORDER BY received_at DESC LIMIT 1")
+            .bind(&mail.thread_key).bind(received_at - 30 * 86_400_000).bind(received_at + 30 * 86_400_000).fetch_optional(&mut *tx).await?;
     }
     let thread_id = thread_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let message_id = if mail.message_id.is_empty() {
@@ -407,23 +424,29 @@ pub async fn persist(
 }
 
 pub async fn process_next(pool: &SqlitePool, pipeline: Arc<Pipeline>) -> Result<bool> {
-    let job = sqlx::query("UPDATE jobs SET status='processing',attempts=attempts+1 WHERE id=(SELECT id FROM jobs WHERE status='pending' ORDER BY received_at LIMIT 1) RETURNING id,raw,envelope,received_at,attempts")
+    let job = sqlx::query("UPDATE jobs SET status='processing',attempts=attempts+1 WHERE id=(SELECT id FROM jobs WHERE status='pending' ORDER BY received_at LIMIT 1) RETURNING id,raw,envelope,import_state,received_at,attempts")
         .fetch_optional(pool).await?;
     let Some(job) = job else {
         return Ok(false);
     };
     let id: String = job.get("id");
     let raw: Vec<u8> = job.get("raw");
-    let received_at: i64 = job.get("received_at");
+    let import_state: Option<String> = job.get("import_state");
+    let mut received_at: i64 = job.get("received_at");
     let started = std::time::Instant::now();
     let result: Result<()> = async {
         let envelope: Envelope = serde_json::from_str(job.get("envelope"))?;
         let rules = db::rules(pool).await?;
         let raw_clone = raw.clone();
         let envelope_clone = envelope.clone();
-        let parsed =
+        let mut parsed =
             tokio::task::spawn_blocking(move || pipeline.run(&raw_clone, &envelope_clone, &rules))
                 .await??;
+        if let Some(state) = import_state.as_deref() {
+            let state: ImportState = serde_json::from_str(state)?;
+            apply_import_state(&mut parsed, &state);
+            received_at = state.received_at.unwrap_or(received_at);
+        }
         persist(
             pool,
             &id,

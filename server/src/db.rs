@@ -1,6 +1,6 @@
 use crate::{
     config::Config,
-    models::{Account, Envelope, Rule},
+    models::{Account, Envelope, ImportState, Rule},
 };
 use anyhow::Result;
 use sqlx::{
@@ -68,11 +68,22 @@ pub async fn rules(pool: &SqlitePool) -> Result<Vec<Rule>> {
 }
 
 pub async fn enqueue(pool: &SqlitePool, raw: Vec<u8>, envelope: &Envelope) -> Result<String> {
+    enqueue_import(pool, raw, envelope, None).await
+}
+
+/// Queues mail like `enqueue`; `state` replaces the defaults for newly received mail.
+pub async fn enqueue_import(
+    pool: &SqlitePool,
+    raw: Vec<u8>,
+    envelope: &Envelope,
+    state: Option<&ImportState>,
+) -> Result<String> {
     let id = Uuid::new_v4().to_string();
-    sqlx::query("INSERT INTO jobs(id,raw,envelope,status,received_at) VALUES(?,?,?,'pending',?)")
+    sqlx::query("INSERT INTO jobs(id,raw,envelope,import_state,status,received_at) VALUES(?,?,?,?,'pending',?)")
         .bind(&id)
         .bind(raw)
         .bind(serde_json::to_string(envelope)?)
+        .bind(state.map(serde_json::to_string).transpose()?)
         .bind(now())
         .execute(pool)
         .await?;

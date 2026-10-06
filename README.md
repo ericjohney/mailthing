@@ -86,6 +86,21 @@ All mailbox state is stored as labels on individual messages, following Gmail's 
 
 System labels can't be renamed, deleted, or shadowed by a user label with the same name.
 
+## Importing mail
+
+`POST /api/import` queues one message through the same pipeline as SMTP mail. The body is JSON with `raw`, the base64-encoded RFC 822 message. Optional fields carry the state the message had in another mailbox, such as Gmail:
+
+```json
+{
+  "raw": "<base64>",
+  "received_at": 1700000000000,
+  "system_labels": ["INBOX", "UNREAD", "STARRED"],
+  "labels": ["Receipts", "Travel"]
+}
+```
+
+`received_at` is the original receipt time in Unix milliseconds; it orders and threads the message instead of the import time. `system_labels` replaces the state labels new mail would get, and may contain `INBOX`, `SENT`, `SPAM`, `TRASH`, `UNREAD`, `STARRED`, and `IMPORTANT`; an empty list imports the message archived and read. `labels` are your own label names, matched case-insensitively and created when missing. Filter labels and the inbox category still apply; omitted fields behave like newly received mail. Import does not detect duplicates, so an importer must track what it has already sent.
+
 ## Storage and processing architecture
 
 ```text
