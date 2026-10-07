@@ -101,6 +101,14 @@ System labels can't be renamed, deleted, or shadowed by a user label with the sa
 
 `received_at` is the original receipt time in Unix milliseconds; it orders and threads the message instead of the import time. `system_labels` replaces the state labels new mail would get, and may contain `INBOX`, `SENT`, `SPAM`, `TRASH`, `UNREAD`, `STARRED`, and `IMPORTANT`; an empty list imports the message archived and read. `labels` are your own label names, matched case-insensitively and created when missing. Filter labels and the inbox category still apply; omitted fields behave like newly received mail. Import does not detect duplicates, so an importer must track what it has already sent.
 
+`scripts/import-gmail.py` copies mail matching a Gmail search over IMAP, using an app password from `GMAIL_APP_PASSWORD` (prompted if unset). It keeps Gmail's receipt time, labels, and Inbox/read/starred/important/sent state, never modifies Gmail, skips drafts and oversized messages, and records imported Gmail ids under `~/.local/state/mailthing-import/` so re-runs resume without duplicates. Run it with `--dry-run` first to see the count and size:
+
+```sh
+python3 scripts/import-gmail.py --user you@gmail.com --query 'newer_than:2m' --url http://127.0.0.1:9005 --dry-run
+```
+
+Gmail's inbox tabs are not exposed over IMAP, so Mailthing assigns its own categories.
+
 ## Storage and processing architecture
 
 ```text
