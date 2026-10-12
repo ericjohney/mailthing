@@ -35,7 +35,7 @@ struct MailAPI {
         }
         return data
     }
-    func action(_ id: String, _ action: String, value: String = "", until: Double? = nil) async throws {
+    func action(_ id: String, _ action: String, value: String = "", until: Int64? = nil) async throws {
         var body: [String: Any] = ["thread_ids": [id], "action": action, "value": value]
         if let until { body["until"] = until }
         let _: EmptyReply = try await request("actions", method: "POST", body: JSONSerialization.data(withJSONObject: body))

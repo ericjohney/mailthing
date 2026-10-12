@@ -125,7 +125,8 @@ impl Provider {
             .header("apns-collapse-id", message_id)
             .json(&payload)
             .send()
-            .await?;
+            .await
+            .map_err(reqwest::Error::without_url)?;
         let status = response.status().as_u16();
         // Do not log responses containing email content or tokens.
         let reason = response

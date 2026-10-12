@@ -32,7 +32,7 @@ struct Draft: Codable, Identifiable {
     var id = UUID().uuidString
     var to = ""; var cc = ""; var bcc = ""; var subject = ""; var body = ""; var inReplyTo = ""
     var attachments: [DraftAttachment] = []
-    var updatedAt = Date().timeIntervalSince1970 * 1000
+    var updatedAt = Int64(Date().timeIntervalSince1970 * 1000)
     var hasContent: Bool { !to.isEmpty || !subject.isEmpty || !body.isEmpty || !attachments.isEmpty }
     static func reply(to message: MailMessage, all: Bool = false, accountEmail: String = "") -> Draft {
         var draft = Draft()

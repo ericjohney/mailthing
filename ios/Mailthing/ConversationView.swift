@@ -66,7 +66,7 @@ struct ConversationView: View {
                     Button("Mark unread", systemImage: "envelope.badge") { Task { await move("unread") } }
                     Button("Move to Inbox", systemImage: "tray") { Task { await move("inbox") } }
                     Button("Report spam", systemImage: "exclamationmark.octagon") { Task { await move("spam") } }
-                    Button("Snooze until tomorrow", systemImage: "clock") { Task { await store.action(id, "snooze", until: Date().addingTimeInterval(86400).timeIntervalSince1970 * 1000); if store.error == nil { dismiss() } } }
+                    Button("Snooze until tomorrow", systemImage: "clock") { Task { await store.action(id, "snooze", until: Int64(Date().addingTimeInterval(86400).timeIntervalSince1970 * 1000)); if store.error == nil { dismiss() } } }
                     if let labels = store.settings?.labels.filter({ $0.kind == "user" }) {
                         ForEach(labels) { label in
                             let applied = conversation?.labels.contains { $0.id == label.id } ?? false

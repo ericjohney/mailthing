@@ -75,7 +75,7 @@ final class MailStore: ObservableObject {
         } catch { if current == generation { self.error = error.localizedDescription } }
     }
     func select(_ label: String) { self.label = label; search = ""; path = [] }
-    func action(_ id: String, _ action: String, value: String = "", until: Double? = nil) async {
+    func action(_ id: String, _ action: String, value: String = "", until: Int64? = nil) async {
         do { try await api.action(id, action, value: value, until: until); await refresh() }
         catch { self.error = error.localizedDescription }
     }

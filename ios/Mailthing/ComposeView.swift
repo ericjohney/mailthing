@@ -66,7 +66,7 @@ struct ComposeView: View {
     }
     private func save() async {
         busy = true; defer { busy = false }
-        do { if draft.hasContent { draft.updatedAt = Date().timeIntervalSince1970 * 1000; try await store.api.save(draft) }; dismiss() }
+        do { if draft.hasContent { draft.updatedAt = Int64(Date().timeIntervalSince1970 * 1000); try await store.api.save(draft) }; dismiss() }
         catch { self.error = error.localizedDescription }
     }
     private func send() async {

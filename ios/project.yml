@@ -31,6 +31,8 @@ targets:
       path: Mailthing/Info.plist
       properties:
         CFBundleDisplayName: Mailthing
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UIBackgroundModes: [remote-notification]
         ITSAppUsesNonExemptEncryption: false
