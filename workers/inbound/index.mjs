@@ -1,10 +1,6 @@
 // Stream directly to Mailthing. No queues, storage bindings, or background delivery.
 export default {
   async email(message, env) {
-    if (message.to.split("@").at(-1).toLowerCase() !== env.MAIL_DOMAIN) {
-      message.setReject("Recipient domain is not configured");
-      return;
-    }
     if (message.rawSize > 25 * 1024 * 1024) {
       message.setReject("Message exceeds 25 MiB");
       return;

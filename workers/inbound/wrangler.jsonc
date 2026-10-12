@@ -6,7 +6,6 @@
   "workers_dev": false,
   "preview_urls": false,
   "vars": {
-    "MAIL_DOMAIN": "ericj5.com",
     "INBOUND_URL": "https://mail-ingest.ericj5.com"
   },
   "observability": {
