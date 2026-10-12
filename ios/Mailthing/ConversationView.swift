@@ -158,7 +158,7 @@ struct SafeEmailHTML: UIViewRepresentable {
     static func document(_ html: String, showImages: Bool = false) -> String {
         let images = showImages ? "https: http: data:" : "data:"
         return """
-        <!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src \(images); base-uri 'none'; form-action 'none'"><style>:root{color-scheme:light}body{color:#202124;background:#fff;font:16px -apple-system,sans-serif;margin:0;overflow-wrap:anywhere}img{max-width:100%}pre{white-space:pre-wrap}a{color:#346dd6}</style></head><body><div id="mailthing-content">\(html)</div></body></html>
+        <!doctype html><html><head><meta id="mailthing-viewport" name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src \(images); base-uri 'none'; form-action 'none'"><style>:root{color-scheme:light}body{color:#202124;background:#fff;font:16px -apple-system,sans-serif;margin:0;overflow-wrap:anywhere}img{max-width:100%}pre{white-space:pre-wrap}a{color:#346dd6}</style></head><body><div id="mailthing-content">\(html)</div></body></html>
         """
     }
     static let layoutScript = """
@@ -168,13 +168,19 @@ struct SafeEmailHTML: UIViewRepresentable {
       let pending = false, lastHeight = 0, lastWidth = 0;
       const measure = () => {
         pending = false;
-        const width = document.documentElement.clientWidth;
+        const viewport = window.visualViewport;
+        const width = Math.round(viewport ? viewport.width * viewport.scale : window.innerWidth);
         if (!width) return;
         root.style.display = 'flow-root';
-        root.style.width = width + 'px'; root.style.zoom = '1';
+        root.style.setProperty('-webkit-text-size-adjust', 'none', 'important');
+        root.style.width = width + 'px';
         const natural = Math.max(width, root.scrollWidth);
-        root.style.width = natural + 'px'; root.style.zoom = String(width / natural);
-        const height = Math.ceil(root.getBoundingClientRect().height) + 1;
+        root.style.width = natural + 'px';
+        const meta = document.getElementById('mailthing-viewport');
+        const policy = 'width=' + natural + ',initial-scale=' + (width / natural);
+        if (meta.content !== policy) meta.content = policy;
+        const scale = window.visualViewport?.scale || 1;
+        const height = Math.ceil(root.getBoundingClientRect().height * scale) + 1;
         if (height !== lastHeight) {
           lastHeight = height;
           window.webkit.messageHandlers.mailthingSize.postMessage(height);
@@ -187,6 +193,7 @@ struct SafeEmailHTML: UIViewRepresentable {
         if (width !== lastWidth) { lastWidth = width; schedule(); }
       }).observe(document.documentElement);
       window.addEventListener('resize', schedule);
+      window.visualViewport?.addEventListener('resize', schedule);
       document.addEventListener('load', schedule, true);
       document.addEventListener('error', schedule, true);
       schedule();

@@ -61,19 +61,20 @@ final class MailthingTests: XCTestCase {
         window.makeKeyAndVisible()
         defer { SafeEmailHTML.dismantleUIView(web, coordinator: coordinator); window.isHidden = true }
         XCTAssertFalse(web.configuration.defaultWebpagePreferences.allowsContentJavaScript)
-        let html = "<style>.offer { color:rgb(255,0,0) }</style><div style='display:none'>hidden padding</div><table width='600' style='width:600px'><tr><td><p class='offer'>Product details</p><div style='height:1200px'>Long email</div></td></tr></table><script>window.emailScriptExecuted = true</script>"
+        let html = "<style>.offer { color:rgb(255,0,0) }</style><div id='preview-padding' style='display:none'>hidden padding</div><table width='600' style='width:600px'><tr><td><p class='offer'>Product details</p><div style='height:1200px'>Long email</div></td></tr></table><script>window.emailScriptExecuted = true</script>"
         web.loadHTMLString(SafeEmailHTML.document(html), baseURL: nil)
         for _ in 0..<100 {
-            if coordinator.measuredHeight > 600 { break }
+            if coordinator.measuredHeight > 600 && coordinator.measuredHeight < 1000 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         XCTAssertGreaterThan(coordinator.measuredHeight, 600, "The trusted layout script must run even though email scripts are disabled")
-        let result = try await evaluate(web, "({width:document.documentElement.scrollWidth, viewport:document.documentElement.clientWidth, hidden:getComputedStyle(document.querySelector('[style*=none]')).display, color:getComputedStyle(document.querySelector('.offer')).color, executed:window.emailScriptExecuted === true})")
+        let result = try await evaluate(web, "({width:document.documentElement.scrollWidth * window.visualViewport.scale, viewport:window.visualViewport.width * window.visualViewport.scale, hidden:getComputedStyle(document.getElementById('preview-padding')).display, color:getComputedStyle(document.querySelector('.offer')).color, textAdjust:getComputedStyle(document.getElementById('mailthing-content')).getPropertyValue('-webkit-text-size-adjust'), executed:window.emailScriptExecuted === true})")
         let metrics = try XCTUnwrap(result as? [String: Any], "Unexpected JavaScript result: \(String(describing: result))")
         XCTAssertLessThanOrEqual((metrics["width"] as! NSNumber).doubleValue, (metrics["viewport"] as! NSNumber).doubleValue + 1)
         XCTAssertEqual(metrics["hidden"] as? String, "none")
         XCTAssertEqual(metrics["color"] as? String, "rgb(255, 0, 0)")
         XCTAssertEqual(metrics["executed"] as? Bool, false)
+        XCTAssertEqual(metrics["textAdjust"] as? String, "none")
         let before = coordinator.measuredHeight
         _ = try await evaluate(web, "document.querySelector('td').insertAdjacentHTML('beforeend', '<div style=\"height:600px\">Image arriving later</div>')")
         for _ in 0..<50 {
@@ -86,7 +87,7 @@ final class MailthingTests: XCTestCase {
             if coordinator.measuredHeight < before + 200 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
-        let widthResult = try await evaluate(web, "document.documentElement.scrollWidth")
+        let widthResult = try await evaluate(web, "document.documentElement.scrollWidth * window.visualViewport.scale")
         let width = try XCTUnwrap(widthResult as? NSNumber)
         XCTAssertLessThanOrEqual(width.doubleValue, 281)
     }

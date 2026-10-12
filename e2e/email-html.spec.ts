@@ -45,11 +45,21 @@ test('keeps offer formatting, fits narrow screens, expands height, and loads ima
   expect(
     await email.locator('html').evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
   ).toBeTruthy();
-  expect(await email.locator('img').evaluate((e) => (e as HTMLImageElement).naturalWidth)).toBe(0);
+  expect(
+    await email
+      .locator('img')
+      .evaluate((e) => (e as HTMLImageElement).naturalWidth)
+      .catch(() => -1),
+  ).toBe(0);
   expect(images).toBe(0);
   await page.getByRole('button', { name: 'Show images', exact: true }).click();
   await expect
-    .poll(async () => email.locator('img').evaluate((e) => (e as HTMLImageElement).naturalWidth))
+    .poll(async () =>
+      email
+        .locator('img')
+        .evaluate((e) => (e as HTMLImageElement).naturalWidth)
+        .catch(() => -1),
+    )
     .toBe(140);
   expect(images).toBe(1);
   await expect(email.getByText('Shop now')).toBeVisible();
@@ -62,7 +72,12 @@ test('keeps offer formatting, fits narrow screens, expands height, and loads ima
   ).toBeTruthy();
   await page.getByRole('button', { name: 'Hide images', exact: true }).click();
   await expect
-    .poll(async () => email.locator('img').evaluate((e) => (e as HTMLImageElement).naturalWidth))
+    .poll(async () =>
+      email
+        .locator('img')
+        .evaluate((e) => (e as HTMLImageElement).naturalWidth)
+        .catch(() => -1),
+    )
     .toBe(0);
   expect(images).toBe(1);
 });

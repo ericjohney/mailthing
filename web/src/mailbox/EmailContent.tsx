@@ -37,6 +37,7 @@ export function EmailContent({ sender, html }: { sender: string; html: string })
       const viewport = iframe.clientWidth;
       if (!viewport) return;
       content.style.display = 'flow-root';
+      content.style.setProperty('-webkit-text-size-adjust', 'none', 'important');
       content.style.width = `${viewport}px`;
       content.style.zoom = '1';
       const naturalWidth = Math.max(viewport, content.scrollWidth);
