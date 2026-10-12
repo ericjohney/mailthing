@@ -1,5 +1,5 @@
 use anyhow::Result;
-use mailthing::{AppState, api, config::Config, db, smtp};
+use mailthing::{AppState, api, config::Config, db, push, smtp};
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -27,7 +27,10 @@ async fn main() -> Result<()> {
     smtp::tls_acceptor(&state)?;
     let stop = state.shutdown.clone();
     let stopped = state.shutdown.subscribe();
-    let workers = state.start_workers(stopped.clone());
+    let mut workers = state.start_workers(stopped.clone());
+    if let Some(config) = push::PushConfig::from_env()? {
+        workers.push(push::start(state.clone(), stopped.clone(), config)?);
+    }
     tracing::info!(web=%web.local_addr()?, smtp=%smtp_listener.local_addr()?, "Mailthing is ready");
     let smtp_state = state.clone();
     let smtp_task = tokio::spawn(smtp::serve(smtp_listener, smtp_state, stopped));

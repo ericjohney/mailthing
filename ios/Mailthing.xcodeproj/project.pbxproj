@@ -1,0 +1,452 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0573C350D87928F528F8510C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3FB66870F6A0D4DF83690B4E /* Assets.xcassets */; };
+		0C6705DA0D9FFAA85AA99243 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BFDE998B9D73832D063B94F /* Models.swift */; };
+		24A4C210255FE92BB771C06E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A2D5934F17924A85AECF69 /* SettingsView.swift */; };
+		4FD0557CAFD37C711039DDFB /* MailthingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C322426BBCAA9F44D9D12C7 /* MailthingTests.swift */; };
+		50311835915BE04C7470E45E /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08B856F8015DA04E424C08B0 /* ConversationView.swift */; };
+		5A48DE1A5726755A18B55AD8 /* MailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B01E41E891069A052BFB5B02 /* MailStore.swift */; };
+		5E2B4E04B141644E1E1501BC /* ComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1513F560325D8AAD13C7CC85 /* ComposeView.swift */; };
+		8EDC64D9B44ABF17487F58A1 /* MailthingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A916F68601CFFD0EE4ACBC25 /* MailthingApp.swift */; };
+		B7709AA71E5CE8C7B1485001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F050A01CA1C1489119C73955 /* PrivacyInfo.xcprivacy */; };
+		BC118B2CCDC6218028469C7E /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72F08A0474DF0C96DC9E0E94 /* InboxView.swift */; };
+		C3BA34A07D791E4D898E1B70 /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42FBF20D6F4D058E2569E930 /* API.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D59DE739AA948608DCDF2806 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F78EAE3684AD1FBB23734FE1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5504AEE1F566685EE9B48EDA;
+			remoteInfo = Mailthing;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		08B856F8015DA04E424C08B0 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
+		0C322426BBCAA9F44D9D12C7 /* MailthingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailthingTests.swift; sourceTree = "<group>"; };
+		1513F560325D8AAD13C7CC85 /* ComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeView.swift; sourceTree = "<group>"; };
+		3FB66870F6A0D4DF83690B4E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		42FBF20D6F4D058E2569E930 /* API.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API.swift; sourceTree = "<group>"; };
+		6BFDE998B9D73832D063B94F /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		71C05ABCC5900D1E93A15AAD /* Mailthing.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mailthing.entitlements; sourceTree = "<group>"; };
+		72F08A0474DF0C96DC9E0E94 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		874E0F7D02C643F2D4361E69 /* Mailthing.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Mailthing.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8ACAB084DC3CE91A4832267A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		8B6FAD657C05A60F90542212 /* MailthingTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MailthingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A916F68601CFFD0EE4ACBC25 /* MailthingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailthingApp.swift; sourceTree = "<group>"; };
+		B01E41E891069A052BFB5B02 /* MailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailStore.swift; sourceTree = "<group>"; };
+		E0A2D5934F17924A85AECF69 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F050A01CA1C1489119C73955 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		01D78A9FBBFDE3A87367705B /* MailthingTests */ = {
+			isa = PBXGroup;
+			children = (
+				0C322426BBCAA9F44D9D12C7 /* MailthingTests.swift */,
+			);
+			path = MailthingTests;
+			sourceTree = "<group>";
+		};
+		8863FA2458C71A29C5C82150 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				874E0F7D02C643F2D4361E69 /* Mailthing.app */,
+				8B6FAD657C05A60F90542212 /* MailthingTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AC8AE73F50B1EE6EDB833C41 = {
+			isa = PBXGroup;
+			children = (
+				D6F5BB9E234F230763788E73 /* Mailthing */,
+				01D78A9FBBFDE3A87367705B /* MailthingTests */,
+				8863FA2458C71A29C5C82150 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D6F5BB9E234F230763788E73 /* Mailthing */ = {
+			isa = PBXGroup;
+			children = (
+				42FBF20D6F4D058E2569E930 /* API.swift */,
+				3FB66870F6A0D4DF83690B4E /* Assets.xcassets */,
+				1513F560325D8AAD13C7CC85 /* ComposeView.swift */,
+				08B856F8015DA04E424C08B0 /* ConversationView.swift */,
+				72F08A0474DF0C96DC9E0E94 /* InboxView.swift */,
+				8ACAB084DC3CE91A4832267A /* Info.plist */,
+				B01E41E891069A052BFB5B02 /* MailStore.swift */,
+				71C05ABCC5900D1E93A15AAD /* Mailthing.entitlements */,
+				A916F68601CFFD0EE4ACBC25 /* MailthingApp.swift */,
+				6BFDE998B9D73832D063B94F /* Models.swift */,
+				F050A01CA1C1489119C73955 /* PrivacyInfo.xcprivacy */,
+				E0A2D5934F17924A85AECF69 /* SettingsView.swift */,
+			);
+			path = Mailthing;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0664B68E9B866EC1BCDCD64C /* MailthingTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EFC5161C6C2FC36E525DFCB4 /* Build configuration list for PBXNativeTarget "MailthingTests" */;
+			buildPhases = (
+				21D82B9396E9C1A19B129579 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				740F8EAA0875C0405400DD4F /* PBXTargetDependency */,
+			);
+			name = MailthingTests;
+			packageProductDependencies = (
+			);
+			productName = MailthingTests;
+			productReference = 8B6FAD657C05A60F90542212 /* MailthingTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		5504AEE1F566685EE9B48EDA /* Mailthing */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 53C2E259965F42375EDD49DB /* Build configuration list for PBXNativeTarget "Mailthing" */;
+			buildPhases = (
+				31180E49E012A3C677B4192B /* Sources */,
+				257EDFA391DD8E2F73D451A7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Mailthing;
+			packageProductDependencies = (
+			);
+			productName = Mailthing;
+			productReference = 874E0F7D02C643F2D4361E69 /* Mailthing.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F78EAE3684AD1FBB23734FE1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					0664B68E9B866EC1BCDCD64C = {
+						DevelopmentTeam = 27ZLS4MK3J;
+					};
+					5504AEE1F566685EE9B48EDA = {
+						DevelopmentTeam = 27ZLS4MK3J;
+					};
+				};
+			};
+			buildConfigurationList = F355FB6022762F666C202C12 /* Build configuration list for PBXProject "Mailthing" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = AC8AE73F50B1EE6EDB833C41;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8863FA2458C71A29C5C82150 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5504AEE1F566685EE9B48EDA /* Mailthing */,
+				0664B68E9B866EC1BCDCD64C /* MailthingTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		257EDFA391DD8E2F73D451A7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0573C350D87928F528F8510C /* Assets.xcassets in Resources */,
+				B7709AA71E5CE8C7B1485001 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		21D82B9396E9C1A19B129579 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4FD0557CAFD37C711039DDFB /* MailthingTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		31180E49E012A3C677B4192B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C3BA34A07D791E4D898E1B70 /* API.swift in Sources */,
+				5E2B4E04B141644E1E1501BC /* ComposeView.swift in Sources */,
+				50311835915BE04C7470E45E /* ConversationView.swift in Sources */,
+				BC118B2CCDC6218028469C7E /* InboxView.swift in Sources */,
+				5A48DE1A5726755A18B55AD8 /* MailStore.swift in Sources */,
+				8EDC64D9B44ABF17487F58A1 /* MailthingApp.swift in Sources */,
+				0C6705DA0D9FFAA85AA99243 /* Models.swift in Sources */,
+				24A4C210255FE92BB771C06E /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		740F8EAA0875C0405400DD4F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5504AEE1F566685EE9B48EDA /* Mailthing */;
+			targetProxy = D59DE739AA948608DCDF2806 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3122D74C8310DCD848EA996D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericjohney.MailthingTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mailthing.app/Mailthing";
+			};
+			name = Debug;
+		};
+		6E62C9AE17DC3474C115D7A0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APNS_ENVIRONMENT = development;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 27ZLS4MK3J;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MAILTHING_SERVER_URL = "https://mailthing.ericj5.com";
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		74F78D0FE9D29CD0208130F2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Mailthing/Mailthing.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Mailthing/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericjohney.mailthing;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BCA705905A27B914432EC5BA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericjohney.MailthingTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mailthing.app/Mailthing";
+			};
+			name = Release;
+		};
+		E15ED09312AA29D03424E473 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Mailthing/Mailthing.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Mailthing/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericjohney.mailthing;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		EEDFA76A0C7F1F3A4856802D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APNS_ENVIRONMENT = production;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 27ZLS4MK3J;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MAILTHING_SERVER_URL = "https://mailthing.ericj5.com";
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		53C2E259965F42375EDD49DB /* Build configuration list for PBXNativeTarget "Mailthing" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E15ED09312AA29D03424E473 /* Debug */,
+				74F78D0FE9D29CD0208130F2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		EFC5161C6C2FC36E525DFCB4 /* Build configuration list for PBXNativeTarget "MailthingTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3122D74C8310DCD848EA996D /* Debug */,
+				BCA705905A27B914432EC5BA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F355FB6022762F666C202C12 /* Build configuration list for PBXProject "Mailthing" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6E62C9AE17DC3474C115D7A0 /* Debug */,
+				EEDFA76A0C7F1F3A4856802D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = F78EAE3684AD1FBB23734FE1 /* Project object */;
+}

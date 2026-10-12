@@ -2,6 +2,13 @@
 
 A personal catch-all mail server and a Gmail-style web inbox, rebuilt in Rust and React. Mail is durably queued, processed, and displayed from SQLite. The application starts with an empty mailbox; it never substitutes sample messages for database results.
 
+## iOS app
+
+The native [Mailthing iOS app](ios/README.md) provides a Gmail-style SwiftUI inbox,
+conversations, attachments, drafts, and new-message push notifications. It connects
+to the same Rust API and private mailbox. See the iOS guide for simulator testing,
+APNs configuration, and TestFlight releases.
+
 ## Run locally
 
 Install current stable Rust (with `rustfmt` and `clippy`) and Node.js 24. Rust compilation also needs a C compiler; on Debian/Ubuntu, install `build-essential`.

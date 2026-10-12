@@ -1,0 +1,60 @@
+name: Mailthing
+options:
+  bundleIdPrefix: com.ericjohney
+  deploymentTarget:
+    iOS: '17.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: 27ZLS4MK3J
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+    TARGETED_DEVICE_FAMILY: '1,2'
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    MAILTHING_SERVER_URL: https://mailthing.ericj5.com
+  configs:
+    Debug:
+      APNS_ENVIRONMENT: development
+    Release:
+      APNS_ENVIRONMENT: production
+targets:
+  Mailthing:
+    type: application
+    platform: iOS
+    sources: [Mailthing]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ericjohney.mailthing
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Mailthing/Mailthing.entitlements
+    info:
+      path: Mailthing/Info.plist
+      properties:
+        CFBundleDisplayName: Mailthing
+        UILaunchScreen: {}
+        UIBackgroundModes: [remote-notification]
+        ITSAppUsesNonExemptEncryption: false
+        MailthingServerURL: $(MAILTHING_SERVER_URL)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: [mailthing]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+    entitlements:
+      path: Mailthing/Mailthing.entitlements
+      properties:
+        aps-environment: $(APNS_ENVIRONMENT)
+  MailthingTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [MailthingTests]
+    dependencies:
+      - target: Mailthing
+schemes:
+  Mailthing:
+    build:
+      targets:
+        Mailthing: all
+    test:
+      targets: [MailthingTests]

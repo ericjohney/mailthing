@@ -1,0 +1,116 @@
+# Mailthing for iOS
+
+A native SwiftUI mail app for iOS 17+, with a Gmail-style inbox, inbox categories,
+search, stars, swipe-to-archive/trash/read, labels, threaded conversations,
+sanitized HTML, attachment downloads/sharing, compose/reply/reply-all/forward,
+Cc/Bcc, file attachments, saved drafts, and light/dark appearance.
+
+The default server is `https://mailthing.ericj5.com`, accessible over Tailscale.
+The server address is editable in account settings. HTTP is permitted only for
+loopback development servers. There is no separate mobile login: access follows
+the existing private mailbox's network access control.
+
+Sending requires an outbound SMTP relay configured on the server. If it is not
+configured, the app disables Send and explains that drafts can still be saved.
+The app never presents invented messages as mailbox data.
+
+## Build and test
+
+Install Xcode 26.6 and XcodeGen on a Mac:
+
+```sh
+brew install xcodegen
+cd ios
+xcodegen generate
+xcodebuild -project Mailthing.xcodeproj -scheme Mailthing \
+  -destination 'platform=iOS Simulator,name=iPhone 17e' \
+  CODE_SIGNING_ALLOWED=NO test
+```
+
+`project.yml` is the source of project settings; regenerate after changing it.
+The committed Xcode project can also be opened directly. The iOS Checks workflow
+runs these tests on GitHub-hosted macOS runners. This is a public repository;
+never run its CI on homelab self-hosted runners.
+
+## New-message notifications
+
+Enable notifications in **Account → Settings → New messages**. iOS asks for
+permission to show alerts, play sounds, and update the unread badge. Tokens are
+registered with `POST /api/push/devices`; switching servers unregisters the token
+from the old mailbox before registering with the new one. Native notification
+settings remain available through the app's iOS Settings link.
+
+The server queues each registered device's alert in the same SQLite transaction
+that saves a newly received inbox message. Imports, sent mail, spam, archived
+mail, and read mail don't queue alerts. Receipts reprocessed after recovery don't
+queue duplicate alerts. The outbox survives restarts, retries transient failures
+with backoff (12 attempts), removes invalid tokens, and skips messages read or
+moved out of the inbox before delivery. APNs collapse identifiers reduce duplicate
+alerts if the server crashes after Apple accepts a request. Apple delivery and
+user notification settings ultimately determine whether an alert is displayed.
+
+Server environment (stored in a secret manager, never in Git):
+
+- `APNS_KEY_ID`: the Apple Developer APNs authentication key identifier.
+- `APNS_TEAM_ID`: `27ZLS4MK3J`.
+- `APNS_TOPIC`: `com.ericjohney.mailthing`.
+- `APNS_PRIVATE_KEY`: PKCS#8 `.p8` contents, actual newlines or literal `\n`.
+
+Use an APNs key from Apple Developer → Certificates, Identifiers & Profiles →
+Keys. An App Store Connect upload key is a separate key. Server egress must permit
+HTTPS/HTTP2 to `api.push.apple.com:443` (and `api.sandbox.push.apple.com:443` for
+Debug builds). Release/TestFlight uses the production APNs environment.
+
+Alerts include the sender, subject, and a short preview. Tapping opens the
+conversation. APNs alerts can arrive without Tailscale; loading mail still needs
+the private server connection. Foreground inbox refreshes every 20 seconds and
+supports pull-to-refresh. APNs is required for reliable alerts while closed;
+foreground refresh is not a substitute for push.
+
+Simulator payload injection can verify notification UI and navigation, but does
+not prove that Apple accepted a production push. Verify that separately on the
+TestFlight build with a newly received message.
+
+## TestFlight distribution
+
+Apple team: `27ZLS4MK3J`. Bundle: `com.ericjohney.mailthing`.
+Use the existing PhotoBrain distribution certificate, with a **Mailthing-specific**
+App Store profile that authorizes the Push Notifications capability. PhotoBrain's
+profile is for a different bundle and cannot sign Mailthing.
+
+`ios/scripts/apple.mjs setup` idempotently registers the bundle, enables push,
+creates the App Store Connect app and App Store profile, and creates the internal
+**Me** group using the existing App Store Connect API key. It requires
+`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_PATH`, and `SIGNING_DIRECTORY`. Apple may
+require account-holder login to create the separate APNs key.
+
+`ios/scripts/release.sh` runs on Astra or a GitHub-hosted macOS runner. It requires
+the variables above and `BUILD_NUMBER`, and reads `distribution.p12`,
+`p12-password.txt`, and `Mailthing_AppStore.mobileprovision` from the private signing
+directory. It uses a temporary keychain, validates the profile and signed
+production push entitlement, archives/exports, verifies the production server
+address, and uploads with `altool`. It preserves the user's existing keychain
+search list. `apple.mjs allocate` selects a build number above Apple's history;
+`apple.mjs status` reports processing status.
+
+The **iOS TestFlight Release** workflow is manually dispatched:
+
+```sh
+gh workflow run ios-release.yml --ref master -f version=1.0.0
+```
+
+Required Mailthing repository Actions secrets:
+
+| Secret | Value |
+| --- | --- |
+| `ASC_KEY_ID` | Existing upload key ID |
+| `ASC_ISSUER_ID` | App Store Connect issuer UUID |
+| `ASC_PRIVATE_KEY` | Upload `.p8` contents |
+| `IOS_DISTRIBUTION_CERTIFICATE_BASE64` | Distribution `.p12`, base64 |
+| `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | `.p12` password |
+| `IOS_PROVISIONING_PROFILE_BASE64` | Mailthing App Store profile, base64 |
+
+Keep assets in a mode-0700 directory on Astra and set secrets using file/stdin
+input, never printed values or command arguments. Build artifacts and dSYMs are
+retained by CI. Upload success precedes Apple's processing; check VALID status
+and internal tester/group availability before calling a release available.

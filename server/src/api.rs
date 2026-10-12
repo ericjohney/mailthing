@@ -4,7 +4,7 @@ use crate::{
         Account, AttachmentView, Draft, Envelope, ImportState, Label, MessageView, Rule,
         ThreadSummary,
     },
-    outgoing, search,
+    outgoing, push, search,
 };
 use axum::{
     Json, Router,
@@ -72,6 +72,11 @@ pub fn router(state: AppState) -> Router {
         .route("/pipeline", get(pipeline_status))
         .route("/pipeline/{id}/retry", post(retry_job))
         .route("/events", get(events))
+        .route("/push/devices", post(register_device))
+        .route(
+            "/push/devices/{token}",
+            axum::routing::delete(unregister_device),
+        )
         .fallback(|| async {
             (
                 StatusCode::NOT_FOUND,
@@ -761,4 +766,28 @@ async fn events(State(state): State<AppState>) -> impl IntoResponse {
         } }
     };
     Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
+}
+
+async fn register_device(
+    State(state): State<AppState>,
+    Json(device): Json<push::Device>,
+) -> ApiResult<Json<Value>> {
+    if !device.valid() {
+        return Err(ApiError::bad("Invalid push token or environment"));
+    }
+    sqlx::query("INSERT INTO push_devices(token,environment,registered_at) VALUES(?,?,?) ON CONFLICT(token) DO UPDATE SET environment=excluded.environment,registered_at=excluded.registered_at")
+        .bind(device.token.to_ascii_lowercase()).bind(&device.environment).bind(db::now()).execute(&state.pool).await?;
+    Ok(Json(
+        json!({"ok":true,"configured":push::PushConfig::from_env()?.is_some()}),
+    ))
+}
+async fn unregister_device(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> ApiResult<Json<Value>> {
+    sqlx::query("DELETE FROM push_devices WHERE token=?")
+        .bind(token.to_ascii_lowercase())
+        .execute(&state.pool)
+        .await?;
+    Ok(Json(json!({"ok":true})))
 }

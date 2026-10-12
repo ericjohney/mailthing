@@ -404,11 +404,11 @@ pub async fn persist(
     } else {
         mail.message_id.clone()
     };
-    sqlx::query("INSERT OR IGNORE INTO messages(id,thread_id,message_id,subject,normalized_subject,thread_key,sender,sender_email,recipients,cc,envelope_to,snippet,text,html,raw,received_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    let inserted = sqlx::query("INSERT OR IGNORE INTO messages(id,thread_id,message_id,subject,normalized_subject,thread_key,sender,sender_email,recipients,cc,envelope_to,snippet,text,html,raw,received_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
         .bind(id).bind(&thread_id).bind(message_id).bind(&mail.subject).bind(&mail.normalized_subject).bind(&mail.thread_key)
         .bind(&mail.sender).bind(&mail.sender_email).bind(&mail.recipients).bind(&mail.cc).bind(serde_json::to_string(&envelope.to)?)
         .bind(&mail.snippet).bind(&mail.text).bind(&mail.html).bind(raw).bind(received_at)
-        .execute(&mut *tx).await?;
+        .execute(&mut *tx).await?.rows_affected() > 0;
     for (index, attachment) in mail.attachments.iter().enumerate() {
         sqlx::query("INSERT OR IGNORE INTO attachments(id,message_id,name,content_type,size,content) VALUES(?,?,?,?,?,?)")
             .bind(format!("{id}-{index}")).bind(id).bind(&attachment.name).bind(&attachment.content_type).bind(attachment.content.len() as i64).bind(&attachment.content).execute(&mut *tx).await?;
@@ -419,6 +419,10 @@ pub async fn persist(
     }
     sqlx::query("UPDATE jobs SET status='completed',completed_at=?,duration_ms=?,error=NULL,raw=X'' WHERE id=?")
         .bind(db::now()).bind(duration_ms).bind(id).execute(&mut *tx).await?;
+    if inserted {
+        sqlx::query("INSERT OR IGNORE INTO push_deliveries(message_id,token,next_attempt_at) SELECT ?,d.token,? FROM push_devices d WHERE EXISTS(SELECT 1 FROM jobs WHERE id=? AND kind='incoming' AND import_state IS NULL) AND EXISTS(SELECT 1 FROM message_labels WHERE message_id=? AND label_id='INBOX') AND EXISTS(SELECT 1 FROM message_labels WHERE message_id=? AND label_id='UNREAD') AND NOT EXISTS(SELECT 1 FROM message_labels WHERE message_id=? AND label_id IN ('SPAM','TRASH'))")
+        .bind(id).bind(db::now()).bind(id).bind(id).bind(id).bind(id).execute(&mut *tx).await?;
+    }
     tx.commit().await?;
     Ok(thread_id)
 }

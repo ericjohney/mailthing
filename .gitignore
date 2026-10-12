@@ -10,3 +10,11 @@ node_modules/
 *.db-wal
 /test-results/
 /playwright-report/
+/ios/build/
+/ios/*.xcarchive/
+/ios/export/
+*.ipa
+*.p8
+*.p12
+*.mobileprovision
+xcuserdata/
