@@ -56,8 +56,10 @@ Server environment (stored in a secret manager, never in Git):
 - `APNS_TOPIC`: `com.ericjohney.mailthing`.
 - `APNS_PRIVATE_KEY`: PKCS#8 `.p8` contents, actual newlines or literal `\n`.
 
-Use an APNs key from Apple Developer → Certificates, Identifiers & Profiles →
-Keys. An App Store Connect upload key is a separate key. Server egress must permit
+The deployed server uses the dedicated **Mailthing Push Notifications** key
+`RXSAL6J49G`, supporting Sandbox & Production. Its private key is stored in Vault
+and in `~/.mailthing-signing/` on Astra. Use Apple Developer → Certificates,
+Identifiers & Profiles → Keys to manage it. An App Store Connect upload key is a separate key. Server egress must permit
 HTTPS/HTTP2 to `api.push.apple.com:443` (and `api.sandbox.push.apple.com:443` for
 Debug builds). Release/TestFlight uses the production APNs environment.
 
@@ -74,6 +76,8 @@ TestFlight build with a newly received message.
 ## TestFlight distribution
 
 Apple team: `27ZLS4MK3J`. Bundle: `com.ericjohney.mailthing`.
+App Store Connect: **Mailthing**, app ID `6822085855`, SKU `mailthing-ios`.
+The internal **Me** group contains `eric@ericjohney.com`.
 Use the existing PhotoBrain distribution certificate, with a **Mailthing-specific**
 App Store profile that authorizes the Push Notifications capability. PhotoBrain's
 profile is for a different bundle and cannot sign Mailthing.
@@ -89,10 +93,13 @@ other apps’ beta tester records. It requires
 `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_PATH`, and `SIGNING_DIRECTORY`. Apple may
 require account-holder login to create the separate APNs key.
 
-`ios/scripts/release.sh` runs on Astra or a GitHub-hosted macOS runner. It requires
+Use the GitHub-hosted release workflow for distribution.
+`ios/scripts/release.sh` also supports local macOS builds when the signing
+identity is usable in the login session; Astra’s current Tailscale SSH session
+can read/import the certificate but cannot use it as a signing identity. It requires
 the variables above and `BUILD_NUMBER`, and reads `distribution.p12`,
 `p12-password.txt`, and `Mailthing_AppStore.mobileprovision` from the private signing
-directory. It uses a temporary keychain, validates the profile and signed
+directory. It uses a temporary keychain, imports Apple’s WWDR G3 intermediate, validates the profile and signed
 production push entitlement, archives/exports, verifies the production server
 address, and uploads with `altool`. It preserves the user's existing keychain
 search list. `apple.mjs allocate` selects a build number above Apple's history;
