@@ -231,12 +231,7 @@ impl Stage for SanitizeStage {
     }
     fn run(&self, context: &mut PipelineContext<'_>) -> Result<()> {
         let mail = &mut context.mail;
-        mail.html = ammonia::Builder::default()
-            .rm_tags(&["img"])
-            .url_relative(ammonia::UrlRelative::Deny)
-            .link_rel(Some("noopener noreferrer"))
-            .clean(&mail.html)
-            .to_string();
+        mail.html = crate::email_html::sanitize(&mail.html);
         if mail.text.trim().is_empty() {
             mail.text = ammonia::Builder::default()
                 .tags(HashSet::new())

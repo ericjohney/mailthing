@@ -103,6 +103,8 @@ pub struct MessageView {
     pub envelope_to: String,
     pub text: String,
     pub html: String,
+    #[serde(skip)]
+    pub raw: Vec<u8>,
     pub received_at: i64,
     pub snoozed_until: Option<i64>,
     #[sqlx(json)]

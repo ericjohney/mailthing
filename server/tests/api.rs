@@ -29,6 +29,43 @@ async fn request(app: &Router, method: &str, path: &str, data: Value) -> (Status
 }
 
 #[tokio::test]
+async fn restores_legacy_html_from_raw_without_mutating_or_exposing_raw_mail() {
+    let (_temp, state) = setup().await;
+    let raw = b"From: Sam <sam@example.net>\r\nSubject: A saved offer\r\nContent-Type: text/html\r\n\r\n<div style=\"display:none\">hidden padding</div><table width=\"600\"><tr><td style=\"color:red\">Offer<img src=\"https://images.example/item.png\"></td></tr></table>".to_vec();
+    let thread = deliver(&state, raw).await;
+    sqlx::query("UPDATE messages SET html='<p>Old stripped HTML</p>' WHERE thread_id=?")
+        .bind(&thread)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    let (_, body) = request(
+        &api::router(state.clone()),
+        "GET",
+        &format!("/api/threads/{thread}"),
+        json!(null),
+    )
+    .await;
+    let message = &body["messages"][0];
+    let html = message["html"].as_str().unwrap();
+    assert!(html.contains("display:none"));
+    assert!(html.contains("width=\"600\""));
+    assert!(html.contains("https://images.example/item.png"));
+    assert!(message.get("raw").is_none());
+    assert!(
+        message["labels"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("UNREAD"))
+    );
+    let stored: String = sqlx::query_scalar("SELECT html FROM messages WHERE thread_id=?")
+        .bind(&thread)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    assert_eq!(stored, "<p>Old stripped HTML</p>");
+}
+
+#[tokio::test]
 async fn mailbox_search_bulk_actions_labels_and_trash() {
     let (_temp, state) = setup().await;
     let first = deliver(

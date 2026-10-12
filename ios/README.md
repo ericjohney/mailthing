@@ -5,6 +5,12 @@ search, stars, swipe-to-archive/trash/read, labels, threaded conversations,
 sanitized HTML, attachment downloads/sharing, compose/reply/reply-all/forward,
 Cc/Bcc, file attachments, saved drafts, and light/dark appearance.
 
+HTML email preserves the sender's styles and tables, fits fixed-width layouts
+to the available width, and grows to show the full message, including images
+that finish loading later. Remote images are hidden until **Show images** is
+selected for that message. Email scripts, forms, frames, external stylesheets,
+and fonts remain blocked; app-owned sizing code runs in a separate WebKit world.
+
 The default server is `https://mailthing.ericj5.com`, accessible over Tailscale.
 The server address is editable in account settings. HTTP is permitted only for
 loopback development servers. There is no separate mobile login: access follows

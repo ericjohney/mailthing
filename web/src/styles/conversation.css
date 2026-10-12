@@ -109,10 +109,25 @@
 }
 .email-html {
   width: 100%;
-  height: 380px;
+  min-height: 100px;
   border: 0;
   background: var(--color-email-surface);
   display: block;
+}
+.email-content {
+  min-width: 0;
+}
+.email-image-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.email-image-controls button {
+  color: var(--color-link);
+  text-decoration: underline;
 }
 .email-collapsed {
   padding-top: var(--space-4);

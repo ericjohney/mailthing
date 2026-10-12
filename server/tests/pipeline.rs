@@ -17,13 +17,12 @@ fn mime_decoding_sanitization_and_attachment_extraction() {
     assert_eq!(mail.sender, "Sam Rivera");
     assert!(mail.text.contains("Hello ✓"));
     assert!(mail.html.contains("<strong>world</strong>"));
-    for unsafe_text in [
-        "<script",
-        "<img",
-        "onerror",
-        "javascript:",
-        "tracker.example",
-    ] {
+    // Image URLs are preserved for the renderer's explicit Show images control.
+    assert!(
+        mail.html
+            .contains("<img src=\"https://tracker.example/pixel\"")
+    );
+    for unsafe_text in ["<script", "onerror", "javascript:"] {
         assert!(!mail.html.contains(unsafe_text));
     }
     assert_eq!(mail.attachments.len(), 1);

@@ -197,7 +197,8 @@ async fn security(request: Request, next: Next) -> Response {
     );
     headers.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
     headers.insert("x-frame-options", HeaderValue::from_static("DENY"));
-    headers.insert("content-security-policy", HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"));
+    // Email frames add a stricter CSP that permits remote images only on request.
+    headers.insert("content-security-policy", HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; frame-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"));
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response
 }
@@ -304,11 +305,29 @@ async fn threads(
     ))
 }
 async fn thread(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
-    let messages: Vec<MessageView> = sqlx::query_as("SELECT id,thread_id,message_id,subject,sender,sender_email,recipients,cc,envelope_to,text,html,received_at,snoozed_until,(SELECT json_group_array(label_id) FROM message_labels WHERE message_id=messages.id) AS labels FROM messages WHERE thread_id=? ORDER BY received_at,id")
+    let messages: Vec<MessageView> = sqlx::query_as("SELECT id,thread_id,message_id,subject,sender,sender_email,recipients,cc,envelope_to,text,html,raw,received_at,snoozed_until,(SELECT json_group_array(label_id) FROM message_labels WHERE message_id=messages.id) AS labels FROM messages WHERE thread_id=? ORDER BY received_at,id")
         .bind(&id).fetch_all(&state.pool).await?;
     if messages.is_empty() {
         return Err(ApiError::not_found());
     }
+    let messages = tokio::task::spawn_blocking(move || {
+        messages
+            .into_iter()
+            .map(|mut message| {
+                message.html = crate::email_html::from_raw(&message.raw)
+                    .unwrap_or_else(|_| crate::email_html::sanitize(&message.html));
+                message.raw = Vec::new();
+                message
+            })
+            .collect::<Vec<_>>()
+    })
+    .await
+    .map_err(|_| {
+        ApiError(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not render message".into(),
+        )
+    })?;
     let attachments: Vec<AttachmentView> = sqlx::query_as("SELECT a.id,a.message_id,a.name,a.content_type,a.size FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.thread_id=?").bind(&id).fetch_all(&state.pool).await?;
     let labels: Vec<Label> = sqlx::query_as("SELECT DISTINCT l.* FROM labels l JOIN message_labels ml ON ml.label_id=l.id JOIN messages m ON m.id=ml.message_id WHERE m.thread_id=?").bind(&id).fetch_all(&state.pool).await?;
     Ok(Json(

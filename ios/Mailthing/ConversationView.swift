@@ -33,7 +33,7 @@ struct ConversationView: View {
                                 Text(Date(timeIntervalSince1970: message.receivedAt / 1000), format: .dateTime.month(.abbreviated).day()).font(.caption2).foregroundStyle(.secondary)
                             }
                             if message.html.isEmpty { Text(message.text).font(.system(size: 16)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
-                            else { SafeEmailHTML(html: message.html) }
+                            else { EmailBody(html: message.html) }
                             ForEach(conversation.attachments.filter { $0.messageId == message.id }) { attachment in
                                 Button { Task { await download(attachment) } } label: {
                                     HStack(spacing: 12) {
@@ -107,39 +107,101 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
+struct EmailBody: View {
+    let html: String
+    @State private var showImages = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if html.range(of: "<img\\b|url\\s*\\(", options: .regularExpression) != nil {
+                HStack {
+                    Text(showImages ? "Remote images are shown." : "Remote images are hidden.").foregroundStyle(.secondary)
+                    Button(showImages ? "Hide images" : "Show images") { showImages.toggle() }
+                }.font(.caption)
+            }
+            SafeEmailHTML(html: html, showImages: showImages)
+        }
+    }
+}
+
 struct SafeEmailHTML: UIViewRepresentable {
     let html: String
+    var showImages = false
     @State private var height: CGFloat = 200
+    static let layoutWorld = WKContentWorld.world(name: "MailthingLayout")
     func makeCoordinator() -> Coordinator { Coordinator(self) }
-    func makeUIView(context: Context) -> WKWebView {
+    func makeUIView(context: Context) -> WKWebView { makeWebView(coordinator: context.coordinator) }
+    func makeWebView(coordinator: Coordinator) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        // Only app-owned layout code executes, in a separate JavaScript world.
+        configuration.userContentController.addUserScript(WKUserScript(source: Self.layoutScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: Self.layoutWorld))
+        configuration.userContentController.add(coordinator, contentWorld: Self.layoutWorld, name: "mailthingSize")
         let web = WKWebView(frame: .zero, configuration: configuration)
-        web.navigationDelegate = context.coordinator; web.scrollView.isScrollEnabled = false
+        web.navigationDelegate = coordinator
+        web.scrollView.isScrollEnabled = false
         web.isOpaque = false; web.backgroundColor = .clear
         return web
     }
     func updateUIView(_ web: WKWebView, context: Context) {
         context.coordinator.parent = self
-        guard context.coordinator.html != html else { return }
-        context.coordinator.html = html
-        web.loadHTMLString(Self.document(html), baseURL: nil)
+        let document = Self.document(html, showImages: showImages)
+        guard context.coordinator.document != document else { return }
+        context.coordinator.document = document
+        web.loadHTMLString(document, baseURL: nil)
+    }
+    static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) {
+        web.configuration.userContentController.removeScriptMessageHandler(forName: "mailthingSize", contentWorld: layoutWorld)
+        web.stopLoading(); web.navigationDelegate = nil
     }
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: WKWebView, context: Context) -> CGSize? { CGSize(width: proposal.width ?? 320, height: height) }
-    static func document(_ html: String) -> String {
-        """
-        <!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'"><style>:root{color-scheme:light dark}body{font:16px -apple-system,sans-serif;margin:0;overflow-wrap:anywhere}img,table{max-width:100%}pre{white-space:pre-wrap}a{color:#346dd6}</style></head><body>\(html)</body></html>
+    static func document(_ html: String, showImages: Bool = false) -> String {
+        let images = showImages ? "https: http: data:" : "data:"
+        return """
+        <!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src \(images); base-uri 'none'; form-action 'none'"><style>:root{color-scheme:light}body{color:#202124;background:#fff;font:16px -apple-system,sans-serif;margin:0;overflow-wrap:anywhere}img{max-width:100%}pre{white-space:pre-wrap}a{color:#346dd6}</style></head><body><div id="mailthing-content">\(html)</div></body></html>
         """
     }
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        var parent: SafeEmailHTML; var html: String?
+    static let layoutScript = """
+    (() => {
+      const root = document.getElementById('mailthing-content');
+      if (!root) return;
+      let pending = false, lastHeight = 0, lastWidth = 0;
+      const measure = () => {
+        pending = false;
+        const width = document.documentElement.clientWidth;
+        if (!width) return;
+        root.style.display = 'flow-root';
+        root.style.width = width + 'px'; root.style.zoom = '1';
+        const natural = Math.max(width, root.scrollWidth);
+        root.style.width = natural + 'px'; root.style.zoom = String(width / natural);
+        const height = Math.ceil(root.getBoundingClientRect().height) + 1;
+        if (height !== lastHeight) {
+          lastHeight = height;
+          window.webkit.messageHandlers.mailthingSize.postMessage(height);
+        }
+      };
+      const schedule = () => { if (!pending) { pending = true; requestAnimationFrame(measure); } };
+      new ResizeObserver(schedule).observe(root);
+      new ResizeObserver(() => {
+        const width = document.documentElement.clientWidth;
+        if (width !== lastWidth) { lastWidth = width; schedule(); }
+      }).observe(document.documentElement);
+      window.addEventListener('resize', schedule);
+      document.addEventListener('load', schedule, true);
+      document.addEventListener('error', schedule, true);
+      schedule();
+    })();
+    """
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        var parent: SafeEmailHTML; var document: String?
+        private(set) var measuredHeight: CGFloat = 0
         init(_ parent: SafeEmailHTML) { self.parent = parent }
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            // App-owned measurement; email JavaScript is disabled.
-            webView.evaluateJavaScript("document.documentElement.scrollHeight") { result, _ in
-                if let height = result as? Double { self.parent.height = max(100, height) }
-            }
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let value = message.body as? NSNumber else { return }
+            let height = CGFloat(value.doubleValue)
+            guard height.isFinite, height > 0, height != measuredHeight else { return }
+            measuredHeight = height
+            DispatchQueue.main.async { self.parent.height = min(100_000, max(100, height)) }
         }
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             if navigationAction.navigationType == .linkActivated {

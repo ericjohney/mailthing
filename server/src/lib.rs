@@ -1,6 +1,7 @@
 pub mod api;
 pub mod config;
 pub mod db;
+pub mod email_html;
 pub mod labels;
 pub mod models;
 pub mod outgoing;

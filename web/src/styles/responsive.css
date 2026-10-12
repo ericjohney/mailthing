@@ -424,9 +424,6 @@
   .email-text {
     font-size: var(--font-size-base);
   }
-  .email-html {
-    height: 350px;
-  }
   .reply-actions {
     margin-left: 36px;
     gap: var(--space-2);
