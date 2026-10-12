@@ -97,6 +97,13 @@ Configure the domain's catch-all rule to the
 The web inbox can remain private on Tailscale. Run the Worker checks with
 `node --test workers/inbound/index.test.mjs`.
 
+The owner's deployment routes all incoming `@ericj5.com` and `@ericjohney.com`
+mail through `mailthing-inbound` to `https://mail-ingest.ericj5.com`, retaining
+the Gmail copy described above. Both domains use Cloudflare Email Routing's
+MX records and SPF (`v=spf1 include:_spf.mx.cloudflare.net ~all`). Catch-all
+rules are managed through the Cloudflare API; pushing this repository does
+not update those rules or redeploy the Worker.
+
 For your domain, point its MX record to the hostname of this server, give that hostname an A/AAAA record, and make TCP **port 25** reachable. Set `SMTP_PORT=25` or map external port 25 to the application's unprivileged SMTP port. Ports 2500 and 587 are not used by external MX senders. This is a single-owner catch-all: mail addressed to any valid recipient at this server enters this mailbox.
 
 Set `SMTP_TLS_CERT` and `SMTP_TLS_KEY` to PEM files to advertise STARTTLS on incoming SMTP. Use your outbound relay's verified domain and SPF/DKIM setup for outbound deliverability. Mailthing provides SMTP receipt and its own web mailbox; it does not implement IMAP/POP3, direct-to-MX outbound delivery, or a complete Gmail service.
