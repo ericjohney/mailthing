@@ -79,10 +79,13 @@ listener through Cloudflare Tunnel; it serves token-authenticated
 Receipts are acknowledged after the existing SQLite job queue saves the mail;
 reusing a delivery UUID acknowledges the original receipt without duplicating it.
 
-The Worker streams mail directly to this listener and uses no Cloudflare storage
-or queues. It runs on the Workers Free plan, subject to that plan's limits.
-If Mailthing cannot accept mail, the Worker rejects the delivery; there is no
-Cloudflare outage buffer. Configure the domain's catch-all rule to the
+The Worker streams mail directly to this listener and also forwards a copy to
+the verified Cloudflare destination `ericjohney1@gmail.com`. Both deliveries are
+attempted independently; a failed destination is logged, and the message is
+rejected only if both destinations fail. There is no Cloudflare outage buffer
+or automatic retry of a failed copy. It uses no Cloudflare storage or queues
+and runs on the Workers Free plan, subject to that plan's limits.
+Configure the domain's catch-all rule to the
 `mailthing-inbound` Worker only after verifying the authenticated receiver.
 The web inbox can remain private on Tailscale. Run the Worker checks with
 `node --test workers/inbound/index.test.mjs`.
