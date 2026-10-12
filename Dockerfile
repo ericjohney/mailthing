@@ -20,7 +20,7 @@ COPY --from=server /build/target/release/mailthing /usr/local/bin/mailthing
 COPY --from=web /build/dist/web ./dist/web
 USER mailthing
 ENV WEB_HOST=0.0.0.0 PORT=9005 SMTP_HOST=0.0.0.0 SMTP_PORT=2500 DATABASE_URL=sqlite:///app/data/mailthing.db
-EXPOSE 9005 2500
+EXPOSE 9005 9006 2500
 VOLUME ["/app/data"]
 HEALTHCHECK --interval=30s --timeout=3s CMD curl --fail --silent http://127.0.0.1:9005/health || exit 1
 CMD ["mailthing"]

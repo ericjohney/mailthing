@@ -69,6 +69,24 @@ If the process stops after a relay has accepted a message but before its databas
 
 ## Receiving internet mail
 
+Cloudflare Email Routing can deliver directly over HTTPS using the Worker in
+`workers/inbound`. Set a random `INBOUND_TOKEN` (at least 32 characters) in both
+Mailthing's environment and the Worker's secret bindings. Mailthing then opens
+a separate HTTP listener on `INBOUND_PORT` (default 9006). Expose only that
+listener through Cloudflare Tunnel; it serves token-authenticated
+`POST /inbound/<UUID>` requests containing raw MIME and `X-Envelope-From` /
+`X-Envelope-To` headers, and never serves the mailbox UI or administrative API.
+Receipts are acknowledged after the existing SQLite job queue saves the mail;
+reusing a delivery UUID acknowledges the original receipt without duplicating it.
+
+The Worker streams mail directly to this listener and uses no Cloudflare storage
+or queues. It runs on the Workers Free plan, subject to that plan's limits.
+If Mailthing cannot accept mail, the Worker rejects the delivery; there is no
+Cloudflare outage buffer. Configure the domain's catch-all rule to the
+`mailthing-inbound` Worker only after verifying the authenticated receiver.
+The web inbox can remain private on Tailscale. Run the Worker checks with
+`node --test workers/inbound/index.test.mjs`.
+
 For your domain, point its MX record to the hostname of this server, give that hostname an A/AAAA record, and make TCP **port 25** reachable. Set `SMTP_PORT=25` or map external port 25 to the application's unprivileged SMTP port. Ports 2500 and 587 are not used by external MX senders. This is a single-owner catch-all: mail addressed to any valid recipient at this server enters this mailbox.
 
 Set `SMTP_TLS_CERT` and `SMTP_TLS_KEY` to PEM files to advertise STARTTLS on incoming SMTP. Use your outbound relay's verified domain and SPF/DKIM setup for outbound deliverability. Mailthing provides SMTP receipt and its own web mailbox; it does not implement IMAP/POP3, direct-to-MX outbound delivery, or a complete Gmail service.

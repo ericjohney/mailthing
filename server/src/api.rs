@@ -8,8 +8,9 @@ use crate::{
 };
 use axum::{
     Json, Router,
+    body::Bytes,
     extract::{DefaultBodyLimit, Path, Query, Request, State},
-    http::{HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{
         IntoResponse, Response, Sse,
@@ -87,6 +88,65 @@ pub fn router(state: AppState) -> Router {
         .layer(middleware::from_fn(security))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+/// Separate listener: never exposes the mailbox UI or its administrative API.
+pub fn inbound_router(state: AppState) -> Router {
+    Router::new()
+        .route("/inbound/{id}", post(inbound))
+        .layer(DefaultBodyLimit::max(state.config.max_message_bytes))
+        .layer(middleware::from_fn_with_state(state.clone(), inbound_auth))
+        .with_state(state)
+}
+
+async fn inbound_auth(State(state): State<AppState>, request: Request, next: Next) -> Response {
+    use sha2::{Digest, Sha256};
+    use subtle::ConstantTimeEq;
+    let supplied = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .unwrap_or_default();
+    let expected = &state.config.inbound_token;
+    let valid = Sha256::digest(supplied.as_bytes()).ct_eq(&Sha256::digest(expected.as_bytes()));
+    if expected.is_empty() || !bool::from(valid) {
+        return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+    }
+    next.run(request).await
+}
+
+async fn inbound(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    raw: Bytes,
+) -> ApiResult<Json<Value>> {
+    let id = uuid::Uuid::parse_str(&id).map_err(|_| ApiError::bad("Invalid delivery id"))?;
+    let field = |name: &str| -> Result<String, ApiError> {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned)
+            .ok_or_else(|| ApiError::bad("Missing SMTP envelope"))
+    };
+    let from = field("x-envelope-from")?;
+    let to = field("x-envelope-to")?;
+    if (!from.is_empty() && from.parse::<lettre::Address>().is_err())
+        || to.parse::<lettre::Address>().is_err()
+        || raw.is_empty()
+    {
+        return Err(ApiError::bad("Invalid envelope or empty message"));
+    }
+    let id = format!("inbound:{id}");
+    // Keep the job's id after processing; a repeated HTTP delivery is acknowledged
+    // without queuing another message, even after the user deletes the message.
+    sqlx::query("INSERT INTO jobs(id,raw,envelope,status,received_at) VALUES(?,?,?,'pending',?) ON CONFLICT(id) DO NOTHING")
+        .bind(&id).bind(raw.as_ref())
+        .bind(serde_json::to_string(&Envelope { from, to: vec![to] })?)
+        .bind(db::now()).execute(&state.pool).await?;
+    state.wake.notify_waiters();
+    Ok(Json(json!({"id":id})))
 }
 
 async fn security(request: Request, next: Next) -> Response {

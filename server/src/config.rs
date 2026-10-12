@@ -20,6 +20,8 @@ pub struct Config {
     pub concurrency: usize,
     pub max_message_bytes: usize,
     pub assets: PathBuf,
+    pub inbound_token: String,
+    pub inbound_port: u16,
 }
 
 impl Config {
@@ -54,12 +56,18 @@ impl Config {
             concurrency: get("PIPELINE_CONCURRENCY", "4").parse()?,
             max_message_bytes: get("MAX_MESSAGE_BYTES", "26214400").parse()?,
             assets: get("WEB_ASSETS", "dist/web").into(),
+            inbound_token: get("INBOUND_TOKEN", ""),
+            inbound_port: get("INBOUND_PORT", "9006").parse()?,
         };
         config.validate()?;
         Ok(config)
     }
 
     pub fn validate(&self) -> Result<()> {
+        ensure!(
+            self.inbound_token.is_empty() || self.inbound_token.len() >= 32,
+            "INBOUND_TOKEN must contain at least 32 characters"
+        );
         ensure!(
             (1..=32).contains(&self.concurrency),
             "PIPELINE_CONCURRENCY must be between 1 and 32"

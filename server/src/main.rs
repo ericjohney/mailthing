@@ -18,6 +18,11 @@ async fn main() -> Result<()> {
     let pool = db::connect(&config).await?;
     let web = TcpListener::bind((config.web_host, config.port)).await?;
     let smtp_listener = TcpListener::bind((config.smtp_host, config.smtp_port)).await?;
+    let inbound_listener = if config.inbound_token.is_empty() {
+        None
+    } else {
+        Some(TcpListener::bind((config.web_host, config.inbound_port)).await?)
+    };
     let state = AppState::new(pool, config);
     smtp::tls_acceptor(&state)?;
     let stop = state.shutdown.clone();
@@ -26,6 +31,19 @@ async fn main() -> Result<()> {
     tracing::info!(web=%web.local_addr()?, smtp=%smtp_listener.local_addr()?, "Mailthing is ready");
     let smtp_state = state.clone();
     let smtp_task = tokio::spawn(smtp::serve(smtp_listener, smtp_state, stopped));
+    let inbound_task = inbound_listener.map(|listener| {
+        let mut stopped = state.shutdown.subscribe();
+        let router = api::inbound_router(state.clone());
+        tokio::spawn(async move {
+            axum::serve(listener, router)
+                .with_graceful_shutdown(async move {
+                    if !*stopped.borrow() {
+                        let _ = stopped.changed().await;
+                    }
+                })
+                .await
+        })
+    });
     let shutdown = async move {
         #[cfg(unix)]
         {
@@ -42,6 +60,9 @@ async fn main() -> Result<()> {
         .with_graceful_shutdown(shutdown)
         .await?;
     smtp_task.await??;
+    if let Some(task) = inbound_task {
+        task.await??;
+    }
     for worker in workers {
         worker.await?;
     }

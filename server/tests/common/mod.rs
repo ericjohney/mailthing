@@ -22,6 +22,8 @@ pub async fn setup() -> (TempDir, AppState) {
         concurrency: 4,
         max_message_bytes: 1024 * 1024,
         assets: temp.path().join("assets"),
+        inbound_token: String::new(),
+        inbound_port: 0,
     };
     let pool = db::connect(&config).await.unwrap();
     (temp, AppState::new(pool, config))
