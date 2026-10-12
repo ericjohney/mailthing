@@ -18,7 +18,9 @@ export function EmailContent({ sender, html }: { sender: string; html: string })
     <iframe
       title={`Email from ${sender}`}
       className="email-html"
-      sandbox="allow-popups allow-popups-to-escape-sandbox"
+      // Keep srcDoc compatible with the server's frame-src 'self' policy.
+      // Scripts remain disabled: never pair allow-same-origin with allow-scripts.
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
       srcDoc={document}
     />
   );

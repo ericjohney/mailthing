@@ -68,12 +68,22 @@ test('shares accessible palettes across the inbox, reader, compose, and persiste
     await expect(email.getByText('A readable note in every appearance.')).toBeVisible();
     await expect(page.locator('.email-html')).toHaveAttribute(
       'sandbox',
-      'allow-popups allow-popups-to-escape-sandbox',
+      'allow-same-origin allow-popups allow-popups-to-escape-sandbox',
     );
     const surface = await page
       .locator('.mail-panel')
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     await expect(email.locator('body')).toHaveCSS('background-color', surface);
+    // Even if active content reaches the frame, the sandbox must block execution.
+    await page.locator('.email-html').evaluate((element) => {
+      const frame = element as HTMLIFrameElement;
+      frame.srcdoc += '<script>window.emailScriptExecuted = true</script>';
+    });
+    await expect(email.locator('script')).toBeAttached();
+    await expect(email.getByText('A readable note in every appearance.')).toBeVisible();
+    expect(
+      await email.locator('body').evaluate(() => Reflect.get(window, 'emailScriptExecuted')),
+    ).toBeUndefined();
     await page.getByRole('button', { name: 'Reply', exact: true }).click();
     await expect(page.locator('.compose')).toHaveCSS('background-color', surface);
     await expect(page.getByLabel('To', { exact: true })).toHaveValue('nora@example.net');
