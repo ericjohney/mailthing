@@ -78,9 +78,14 @@ Use the existing PhotoBrain distribution certificate, with a **Mailthing-specifi
 App Store profile that authorizes the Push Notifications capability. PhotoBrain's
 profile is for a different bundle and cannot sign Mailthing.
 
+Create the Mailthing app record in App Store Connect → My Apps → New App after
+registering the bundle; Apple does not allow app creation through the public API.
+
 `ios/scripts/apple.mjs setup` idempotently registers the bundle, enables push,
-creates the App Store Connect app and App Store profile, and creates the internal
-**Me** group using the existing App Store Connect API key. It requires
+creates the App Store profile, and creates the internal
+**Me** group using the existing App Store Connect API key. Add the owner through
+TestFlight → Me → Invite Testers; Apple treats internal users separately from
+other apps’ beta tester records. It requires
 `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_PATH`, and `SIGNING_DIRECTORY`. Apple may
 require account-holder login to create the separate APNs key.
 

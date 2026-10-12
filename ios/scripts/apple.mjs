@@ -35,7 +35,7 @@ if (command === 'setup') {
   if (!capabilities.some(value => value.attributes.capabilityType === 'PUSH_NOTIFICATIONS')) {
     await api('bundleIdCapabilities', 'POST', { data: { type: 'bundleIdCapabilities', attributes: { capabilityType: 'PUSH_NOTIFICATIONS' }, relationships: { bundleId: { data: { type: 'bundleIds', id: bundle.id } } } } });
   }
-  if (!app) app = (await api('apps', 'POST', { data: { type: 'apps', attributes: { bundleId, name: 'Mailthing', primaryLocale: 'en-US', sku: 'mailthing-ios' } } })).data;
+  if (!app) throw new Error('Bundle and push capability registered. Create the Mailthing app record in App Store Connect (My Apps → New App), then run setup again; Apple does not permit app creation through its public API.');
   console.log(`App: ${app.attributes.name} (${app.id}); Bundle: ${bundle.id}`);
   const output = process.env.SIGNING_DIRECTORY;
   if (!output) throw new Error('SIGNING_DIRECTORY is required to save the provisioning profile.');
@@ -50,9 +50,10 @@ if (command === 'setup') {
   writeFileSync(join(output, 'asc-issuer-id'), `${issuer}\n`, { mode: 0o600 });
   let group = (await api(`apps/${app.id}/betaGroups`)).data.find(g => g.attributes.isInternalGroup && g.attributes.name === 'Me');
   if (!group) group = (await api('betaGroups', 'POST', { data: { type: 'betaGroups', attributes: { name: 'Me', isInternalGroup: true, hasAccessToAllBuilds: true }, relationships: { app: { data: { type: 'apps', id: app.id } } } } })).data;
-  const testers = (await api('betaTesters?filter[email]=eric%40ericjohney.com')).data;
-  if (testers.length) await api(`betaGroups/${group.id}/relationships/betaTesters`, 'POST', { data: testers.map(t => ({ type: 'betaTesters', id: t.id })) });
-  console.log(`Profile saved; internal group Me: ${group.id}, matching testers: ${testers.length}`);
+  const testers = (await api(`betaGroups/${group.id}/betaTesters`)).data;
+  const owner = testers.some(t => t.attributes.email === 'eric@ericjohney.com');
+  console.log(`Profile saved; internal group Me: ${group.id}; owner included: ${owner}`);
+  if (!owner) console.log('Add Eric through TestFlight → Me → Invite Testers. Internal testers must be selected as App Store Connect users, not copied from another app’s beta tester records.');
 } else {
   if (!app) throw new Error('Mailthing has no App Store Connect app record yet. Run setup.');
   const builds = (await api(`builds?filter[app]=${app.id}&sort=-uploadedDate&limit=10`)).data;

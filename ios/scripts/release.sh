@@ -9,7 +9,7 @@ RELEASE_VERSION=${RELEASE_VERSION:-1.0.0}
 [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'Invalid build number' >&2; exit 1; }
 [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release version' >&2; exit 1; }
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
-task_temp=$(mktemp -d "${TMPDIR:-/tmp}/mailthing-signing.XXXXXX")
+task_temp=$(mktemp -d "$SIGNING_DIRECTORY/keychain.XXXXXX")
 keychain="$task_temp/signing.keychain-db"
 old_keychains=$(security list-keychains -d user | tr -d '"')
 saved_keychains=()
@@ -25,14 +25,17 @@ cleanup() {
   rm -rf "$task_temp"
 }
 trap cleanup EXIT
+trap 'echo "Release failed at line $LINENO" >&2' ERR
 security create-keychain -p "$keychain_password" "$keychain"
 security set-keychain-settings -lut 21600 "$keychain"
 security unlock-keychain -p "$keychain_password" "$keychain"
 security import "$SIGNING_DIRECTORY/distribution.p12" -k "$keychain" -P "$(cat "$SIGNING_DIRECTORY/p12-password.txt")" -T /usr/bin/codesign -T /usr/bin/security >/dev/null
+curl --fail --silent --show-error https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer -o "$task_temp/AppleWWDRCAG3.cer"
+security import "$task_temp/AppleWWDRCAG3.cer" -k "$keychain" >/dev/null
 security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
 # Add the temporary chain without removing other running builds' chains.
 security list-keychains -d user -s "$keychain" "${saved_keychains[@]}"
-security cms -D -i "$SIGNING_DIRECTORY/Mailthing_AppStore.mobileprovision" > "$task_temp/profile.plist"
+security cms -D -k "$keychain" -i "$SIGNING_DIRECTORY/Mailthing_AppStore.mobileprovision" > "$task_temp/profile.plist"
 profile_uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$task_temp/profile.plist")
 PROFILE_PATH="$task_temp/profile.plist" python3 - <<'PY'
 import datetime, os, plistlib
@@ -52,7 +55,7 @@ archive=${ARCHIVE_PATH:-$PWD/build/Mailthing.xcarchive}
 export_path=${EXPORT_PATH:-$PWD/export}
 xcodebuild archive -project Mailthing.xcodeproj -scheme Mailthing -configuration Release -destination 'generic/platform=iOS' -archivePath "$archive" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" MARKETING_VERSION="$RELEASE_VERSION" DEVELOPMENT_TEAM=27ZLS4MK3J \
-  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Distribution: Eric Johney (27ZLS4MK3J)' \
+  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=B6EAE1911511211D276420A918E4C38825D5CFE6 \
   PROVISIONING_PROFILE_SPECIFIER="$profile_uuid" OTHER_CODE_SIGN_FLAGS="--keychain $keychain"
 EXPORT_PLIST="$task_temp/export.plist" PROFILE_UUID="$profile_uuid" python3 - <<'PY'
 import os, plistlib
