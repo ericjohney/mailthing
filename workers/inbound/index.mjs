@@ -16,6 +16,7 @@ export default {
         headers: {
           "authorization": `Bearer ${env.INBOUND_TOKEN}`,
           "content-type": "message/rfc822",
+          "user-agent": "Mailthing-Inbound/1.0",
           "x-envelope-from": message.from,
           "x-envelope-to": message.to,
         },

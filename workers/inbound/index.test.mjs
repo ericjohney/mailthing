@@ -12,6 +12,7 @@ test("streams the original MIME and SMTP envelope, waits for acceptance", async 
     assert.match(url, /^https:\/\/receiver.example\/inbound\/[\da-f-]{36}$/);
     assert.equal(options.body, raw);
     assert.equal(options.headers["authorization"], "Bearer test-token");
+    assert.equal(options.headers["user-agent"], "Mailthing-Inbound/1.0");
     assert.equal(options.headers["x-envelope-from"], "sender@example.net");
     assert.equal(options.headers["x-envelope-to"], "bcc@ericj5.com");
     delivered = true;
