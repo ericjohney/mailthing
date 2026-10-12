@@ -21,7 +21,7 @@ export default {
           "x-envelope-to": message.to,
         },
         body: message.raw,
-        redirect: "error",
+        redirect: "manual",
         signal: AbortSignal.timeout(25000),
       });
       const accepted = response.ok;

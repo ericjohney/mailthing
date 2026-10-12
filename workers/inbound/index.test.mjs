@@ -11,6 +11,7 @@ test("streams the original MIME and SMTP envelope, waits for acceptance", async 
   t.mock.method(globalThis, "fetch", async (url, options) => {
     assert.match(url, /^https:\/\/receiver.example\/inbound\/[\da-f-]{36}$/);
     assert.equal(options.body, raw);
+    assert.equal(options.redirect, "manual");
     assert.equal(options.headers["authorization"], "Bearer test-token");
     assert.equal(options.headers["user-agent"], "Mailthing-Inbound/1.0");
     assert.equal(options.headers["x-envelope-from"], "sender@example.net");
@@ -25,7 +26,7 @@ test("streams the original MIME and SMTP envelope, waits for acceptance", async 
 
 test("receiver errors reject mail instead of acknowledging or dropping it", async (t) => {
   t.mock.method(console, "error", () => {});
-  for (const failure of [new Response("Unauthorized", { status: 401 }), new Response("Unavailable", { status: 503 }), new Error("Network error")]) {
+  for (const failure of [new Response("Redirect", { status: 302 }), new Response("Unauthorized", { status: 401 }), new Response("Unavailable", { status: 503 }), new Error("Network error")]) {
     t.mock.method(globalThis, "fetch", async () => { if (failure instanceof Error) throw failure; return failure; });
     let rejection;
     await worker.email({ from: "", to: "eric@ericj5.com", rawSize: 1, raw: "x", setReject(reason) { rejection = reason; } }, env);
