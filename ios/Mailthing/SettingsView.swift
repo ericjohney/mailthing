@@ -144,6 +144,7 @@ struct SortingMemoryEditor: View {
     @State private var busy = false
     @State private var error: String?
     @State private var notice: String?
+    @FocusState private var guidanceFocused: Bool
 
     init(memory: SortingMemory, onUpdate: @escaping (SortingMemory) -> Void) {
         self.onUpdate = onUpdate
@@ -156,6 +157,7 @@ struct SortingMemoryEditor: View {
         Form {
             Section {
                 TextEditor(text: $guidance)
+                    .focused($guidanceFocused)
                     .frame(minHeight: 160)
                     .accessibilityLabel("\(memory.name) sorting guidance")
                     .disabled(busy)
@@ -204,10 +206,18 @@ struct SortingMemoryEditor: View {
         .navigationTitle(memory.name)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(busy)
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done editing") { guidanceFocused = false }
+            }
+        }
     }
 
     private func save(clearExamples: Bool) async {
         guard !busy, characterCount <= 2000 else { return }
+        guidanceFocused = false
         busy = true
         error = nil
         notice = nil
@@ -224,6 +234,7 @@ struct SortingMemoryEditor: View {
                 let refreshed = try await store.api.sortingMemories()
                 if let updated = refreshed.first(where: { $0.id == memory.id }) {
                     memory = updated
+                    guidance = updated.guidance
                     onUpdate(updated)
                 }
             } catch {
