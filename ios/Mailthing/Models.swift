@@ -57,7 +57,7 @@ struct Draft: Codable, Identifiable {
     var to = ""; var cc = ""; var bcc = ""; var subject = ""; var body = ""; var inReplyTo = ""
     var attachments: [DraftAttachment] = []
     var updatedAt = Int64(Date().timeIntervalSince1970 * 1000)
-    var hasContent: Bool { !to.isEmpty || !subject.isEmpty || !body.isEmpty || !attachments.isEmpty }
+    var hasContent: Bool { !to.isEmpty || !cc.isEmpty || !bcc.isEmpty || !subject.isEmpty || !body.isEmpty || !attachments.isEmpty }
     static func reply(to message: MailMessage, all: Bool = false, accountEmail: String = "") -> Draft {
         var draft = Draft()
         draft.to = message.senderEmail

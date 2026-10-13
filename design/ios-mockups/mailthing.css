@@ -1,0 +1,176 @@
+main {
+  max-width: 920px;
+  padding: 36px 46px;
+}
+.concepts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 46px;
+}
+.phone {
+  height: 720px;
+}
+.mailthing-nav {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 48px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  gap: 0;
+}
+.mailthing-nav button {
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--text);
+}
+.mailbox-button img {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+.mailthing-nav .mailbox-title {
+  width: auto;
+  gap: 6px;
+  padding: 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+}
+.mailbox-title svg {
+  width: 12px;
+  height: 12px;
+  color: var(--muted);
+}
+.mailbox-title span {
+  font-size: 10px;
+  color: var(--muted);
+  margin-left: 3px;
+  font-weight: 400;
+}
+.nav-actions {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+.compose-action svg {
+  box-sizing: content-box;
+  padding: 7px;
+  width: 18px;
+  height: 18px;
+  background: #292c2d;
+  color: white;
+  border-radius: 9px;
+}
+.mailbox-options {
+  display: flex;
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 10px 20px;
+  background: var(--subtle);
+}
+.mailbox-options select {
+  min-width: 0;
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 5px;
+  font: inherit;
+  font-size: 12px;
+}
+.messages {
+  padding: 1px 0 28px;
+}
+.message {
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+.message .sender {
+  font-size: 14px;
+}
+.message .subject {
+  font-size: 13px;
+}
+.message .snippet {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.message .date {
+  font-size: 10px;
+}
+.message .dot {
+  top: 21px;
+}
+.sender-identity {
+  flex: 1;
+  min-width: 0;
+  padding-left: 3px;
+}
+.sender-identity strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sender-identity span {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.reading {
+  padding: 0 20px 32px;
+}
+.reading h3 {
+  font-size: 21px;
+  line-height: 1.25;
+  margin: 12px 0 0;
+  letter-spacing: -0.4px;
+}
+.letter {
+  margin-top: 15px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.letter p {
+  margin-bottom: 14px;
+}
+.file {
+  margin-top: 18px;
+}
+.home {
+  z-index: 2;
+}
+@media (max-width: 780px) {
+  main {
+    padding: 24px;
+  }
+  .concepts {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .phone {
+    height: 720px;
+  }
+}
+.phone::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 25px;
+  background: var(--surface);
+  pointer-events: none;
+  z-index: 1;
+}

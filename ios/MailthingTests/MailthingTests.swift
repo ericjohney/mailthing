@@ -60,6 +60,16 @@ final class MailthingTests: XCTestCase {
         XCTAssertEqual(decoded.attachments.first?.contentType, "text/plain")
         XCTAssertTrue(decoded.hasContent)
     }
+    func testCcAndBccOnlyDraftsRemainSaveableWhenClosingCompose() throws {
+        var ccDraft = Draft()
+        ccDraft.cc = "friend@example.net"
+        var bccDraft = Draft()
+        bccDraft.bcc = "friend@example.net"
+        for draft in [ccDraft, bccDraft] {
+            let saved = try JSONDecoder.mailthing.decode(Draft.self, from: JSONEncoder.mailthing.encode(draft))
+            XCTAssertTrue(saved.hasContent, "Closing compose must offer to save recipient-only edits")
+        }
+    }
     func testReplyAllExcludesOwnerAndSender() {
         let message = MailMessage(id: "m", threadId: "t", messageId: "<m@example.net>", subject: "Weekend", sender: "Sam", senderEmail: "sam@example.net", recipients: "Eric <eric@example.com>, Friend <friend@example.com>", cc: "sam@example.net", text: "Hello\nWorld", html: "", receivedAt: 0, labels: [])
         let reply = Draft.reply(to: message, all: true, accountEmail: "eric@example.com")

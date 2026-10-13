@@ -1,6 +1,6 @@
 # Mailthing for iOS
 
-A native SwiftUI mail app for iOS 17+, with a Gmail-style inbox, inbox categories,
+A native SwiftUI mail app for iOS 17+, with a compact personal inbox, inbox categories,
 search, stars, swipe-to-archive/trash/read, labels, threaded conversations,
 sanitized HTML, attachment downloads/sharing, compose/reply/reply-all/forward,
 Cc/Bcc, file attachments, saved drafts, and light/dark appearance.
@@ -19,6 +19,30 @@ the existing private mailbox's network access control.
 Sending requires an outbound SMTP relay configured on the server. If it is not
 configured, the app disables Send and explains that drafts can still be saved.
 The app never presents invented messages as mailbox data.
+
+## Interface
+
+The app shares Mailthing's folded-m logo and charcoal palette with the web app.
+Inbox navigation, category selection, search, and compose live in one compact
+header. Search appears on demand; folders, categories, and labels are available
+through the logo button. Message rows use unread dots and fine separators.
+Swipe or long-press a conversation to mark it read/unread or star it.
+
+The reader keeps back navigation, sender details, archive, reply, and more actions
+at the top. Tap the sender for full recipient details and the date. Each message
+in a longer conversation retains its own reply/forward controls. Compose keeps
+attachments and Send at the top; closing a message with content offers save,
+discard, or continued editing. There is no bottom navigation toolbar.
+
+Settings groups notifications, sorting, appearance, connection, and app details.
+Notification controls show actual iOS permission state rather than a simulated
+app switch. System, light, and dark themes use adaptive monochrome controls;
+text uses Dynamic Type and icon controls provide at least 44-point targets.
+
+Simulator screenshots of the implemented screens are in `design/implementation/ios-*.png`.
+They use an isolated sample mailbox, not production account data. The design was
+checked on an iPhone 17 simulator in light/dark mode and with accessibility text
+sizes, including search, category switching, replying, Cc/Bcc, and saving drafts.
 
 ## Sorting guidance and memory
 
@@ -131,7 +155,7 @@ address, and uploads with `altool`. It preserves the user's existing keychain
 search list. `apple.mjs allocate` selects a build number above Apple's history;
 `apple.mjs status` reports processing status.
 
-The release defaults to **1.0.2**. Marketing versions must never be lower than
+The release defaults to **1.0.3**. Marketing versions must never be lower than
 a version already uploaded to App Store Connect, even when the build number
 is higher. The release preflight checks this before signing and verifies both
 version fields in the archived app before upload.
@@ -139,7 +163,7 @@ version fields in the archived app before upload.
 The **iOS TestFlight Release** workflow is manually dispatched:
 
 ```sh
-gh workflow run ios-release.yml --ref master -f version=1.0.2
+gh workflow run ios-release.yml --ref master -f version=1.0.3
 ```
 
 Required Mailthing repository Actions secrets:

@@ -49,6 +49,7 @@ struct MailthingApp: App {
     var body: some Scene {
         WindowGroup {
             InboxView().environmentObject(store)
+                .tint(.mailAction)
                 .preferredColorScheme(appearance == "system" ? nil : appearance == "dark" ? .dark : .light)
                 .task { delegate.attach(store) }
                 .task(id: phase) {

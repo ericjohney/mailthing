@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 : "${SIGNING_DIRECTORY:?Set the private directory holding the Mailthing profile and distribution certificate}"
 : "${ASC_KEY_ID:?}" "${ASC_ISSUER_ID:?}" "${ASC_KEY_PATH:?}"
 : "${BUILD_NUMBER:?Allocate a new App Store Connect build number}"
-export RELEASE_VERSION=${RELEASE_VERSION:-1.0.2}
+export RELEASE_VERSION=${RELEASE_VERSION:-1.0.3}
 [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'Invalid build number' >&2; exit 1; }
 [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release version' >&2; exit 1; }
 node scripts/apple.mjs validate-version

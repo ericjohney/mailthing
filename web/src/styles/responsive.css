@@ -30,7 +30,13 @@
     padding-left: var(--space-4);
   }
   .brand {
-    font-size: 22px;
+    font-size: 20px;
+    gap: 6px;
+  }
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
   }
   .header-actions > .icon-button:first-of-type {
     display: none;

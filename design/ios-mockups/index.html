@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mailthing · iOS design directions</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="board-header">
+        <div>
+          <p class="eyebrow">MAILTHING / iOS EXPLORATIONS</p>
+          <h1>Three ways to feel at home.</h1>
+        </div>
+        <div class="view-switch" aria-label="Preview screen">
+          <button class="selected" data-view="inbox">Inbox</button
+          ><button data-view="reader">Reading</button>
+        </div>
+      </header>
+      <section class="concepts" aria-label="iOS design concepts">
+        <article class="concept native">
+          <div class="concept-heading">
+            <span class="number">01</span>
+            <div>
+              <h2>Quiet native</h2>
+              <p>Familiar gestures. Less visual noise.</p>
+            </div>
+            <span class="recommendation">MY PICK</span>
+          </div>
+          <div class="phone" data-direction="native"></div>
+          <p class="rationale">
+            System type, fine dividers, a clear unread signal.<br />The closest match to the new
+            identity.
+          </p>
+        </article>
+        <article class="concept editorial">
+          <div class="concept-heading">
+            <span class="number">02</span>
+            <div>
+              <h2>Personal letters</h2>
+              <p>Warm paper. A slower, softer rhythm.</p>
+            </div>
+          </div>
+          <div class="phone" data-direction="editorial"></div>
+          <p class="rationale">
+            Ivory surfaces, an expressive serif heading.<br />More personal, with generous room to
+            read.
+          </p>
+        </article>
+        <article class="concept compact">
+          <div class="concept-heading">
+            <span class="number">03</span>
+            <div>
+              <h2>Focused dark</h2>
+              <p>A fast inbox for a busier day.</p>
+            </div>
+          </div>
+          <div class="phone" data-direction="compact"></div>
+          <p class="rationale">
+            Compact rows, muted initials, restrained contrast.<br />More messages visible, fewer
+            distractions.
+          </p>
+        </article>
+      </section>
+      <footer>
+        Concept mockups · Fictional messages · Tap a message to preview reading<span
+          >One identity. Three different rhythms.</span
+        >
+      </footer>
+    </main>
+    <script src="mockups.js"></script>
+  </body>
+</html>

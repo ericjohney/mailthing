@@ -1,0 +1,167 @@
+main {
+  max-width: 920px;
+  padding: 36px 46px;
+}
+.concepts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 46px;
+}
+.phone {
+  height: 720px;
+  --link: #007aff;
+}
+.familiar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 0 5px;
+  height: 44px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+}
+.familiar-nav button {
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  color: var(--link);
+  font-size: 13px;
+}
+.familiar-nav .back-label {
+  gap: 0;
+}
+.back-label svg {
+  width: 20px;
+}
+.familiar-nav select {
+  color: var(--text);
+  background: none;
+  border: 0;
+  font:
+    600 16px -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  max-width: 120px;
+}
+.message-navigation {
+  display: flex;
+}
+.messages {
+  padding-top: 2px;
+}
+.message {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.message .sender {
+  font-size: 14px;
+}
+.message .subject {
+  font-size: 13px;
+}
+.message .snippet {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.message .date {
+  font-size: 10px;
+}
+.message .dot {
+  background: var(--link);
+  top: 21px;
+}
+.bottom-bar {
+  padding: 7px 16px 26px;
+  min-height: 77px;
+  background: #f8f9fb;
+  align-items: center;
+}
+.bottom-bar button {
+  color: var(--link);
+  width: 44px;
+  height: 44px;
+  justify-content: center;
+}
+.mail-status {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.55;
+  text-align: center;
+}
+.mail-status strong {
+  font-weight: 400;
+  color: var(--text);
+  font-size: 10px;
+}
+[data-unread][aria-pressed='true'] {
+  background: #e5efff;
+  border-radius: 50%;
+}
+.reading {
+  padding: 0 20px 20px;
+}
+.reading h3 {
+  font-size: 21px;
+  line-height: 1.25;
+  margin: 10px 0 12px;
+  letter-spacing: -0.4px;
+}
+.familiar-sender {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.familiar-sender strong {
+  font-size: 13px;
+  font-weight: 600;
+  display: block;
+}
+.familiar-sender div > span {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+  display: block;
+}
+.detail-chevron {
+  color: var(--link);
+  padding-left: 3px;
+}
+.sent-at {
+  text-align: right;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.letter {
+  margin-top: 13px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.letter p {
+  margin-bottom: 14px;
+}
+.file {
+  margin-top: 16px;
+}
+.reader-bar {
+  justify-content: space-between;
+}
+@media (max-width: 780px) {
+  main {
+    padding: 24px;
+  }
+  .concepts {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .phone {
+    height: 720px;
+  }
+}

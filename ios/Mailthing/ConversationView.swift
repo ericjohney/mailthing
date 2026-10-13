@@ -11,76 +11,146 @@ struct ConversationView: View {
     @State private var share: SharedFile?
     @State private var downloading = false
     private var isSpam: Bool { conversation?.messages.contains { $0.labels.contains("SPAM") } == true }
+    private var latestMessage: MailMessage? { conversation?.messages.last }
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 16) {
                 if let conversation {
-                    Text(conversation.messages.first?.subject.isEmpty == false ? conversation.messages.first!.subject : "(no subject)").font(.system(size: 26, weight: .regular)).padding(.top, 12)
-                    HStack {
-                        ForEach(conversation.labels.filter { ["INBOX", "IMPORTANT"].contains($0.id) || $0.kind == "user" }) { label in
-                            Text(label.name).font(.caption).padding(.horizontal, 10).padding(.vertical, 5).background(Color.mailSurface).clipShape(Capsule())
+                    Text(conversation.messages.first?.subject.isEmpty == false ? conversation.messages.first!.subject : "(no subject)")
+                        .font(.title3.weight(.semibold)).padding(.top, 12)
+                    let labels = conversation.labels.filter { $0.id == "IMPORTANT" || $0.kind == "user" }
+                    if !labels.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(labels) { label in
+                                    Text(label.name).font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
+                                        .background(Color.mailSurface, in: RoundedRectangle(cornerRadius: 5))
+                                }
+                            }
                         }
                     }
                     ForEach(conversation.messages) { message in
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack(alignment: .top, spacing: 12) {
-                                Text(String(message.sender.prefix(1))).font(.title3).foregroundStyle(.white).frame(width: 40, height: 40).background(Color.mailBlue).clipShape(Circle())
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(message.sender.isEmpty ? message.senderEmail : message.sender).font(.subheadline.bold())
-                                    Text(message.senderEmail).font(.caption).foregroundStyle(.secondary)
-                                    Text("to \(message.recipients)").font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                                }
-                                Spacer(minLength: 0)
-                                Text(Date(timeIntervalSince1970: message.receivedAt / 1000), format: .dateTime.month(.abbreviated).day()).font(.caption2).foregroundStyle(.secondary)
-                            }
-                            if message.html.isEmpty { Text(message.text).font(.system(size: 16)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
-                            else { EmailBody(html: message.html) }
+                        VStack(alignment: .leading, spacing: 14) {
+                            if conversation.messages.count > 1 { messageHeading(message) }
+                            if message.html.isEmpty {
+                                Text(message.text).font(.body).lineSpacing(4).textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else { EmailBody(html: message.html) }
                             ForEach(conversation.attachments.filter { $0.messageId == message.id }) { attachment in
                                 Button { Task { await download(attachment) } } label: {
                                     HStack(spacing: 12) {
-                                        Image(systemName: "doc").font(.title2)
-                                        VStack(alignment: .leading, spacing: 3) { Text(attachment.name).font(.subheadline); Text(ByteCountFormatter.string(fromByteCount: Int64(attachment.size), countStyle: .file)).font(.caption).foregroundStyle(.secondary) }
-                                        Spacer(); Image(systemName: "square.and.arrow.down")
-                                    }.padding(14).background(Color.mailSurface).clipShape(RoundedRectangle(cornerRadius: 12))
+                                        Image(systemName: "doc").font(.title3)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(attachment.name).font(.subheadline).lineLimit(2)
+                                            Text(ByteCountFormatter.string(fromByteCount: Int64(attachment.size), countStyle: .file)).font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "arrow.down.to.line")
+                                    }.foregroundStyle(.primary).padding(14)
+                                        .background(Color.mailSurface, in: RoundedRectangle(cornerRadius: 10))
                                 }.disabled(downloading)
                             }
-                            HStack {
-                                Button { compose = Draft.reply(to: message) } label: { Label("Reply", systemImage: "arrowshape.turn.up.left") }
-                                Menu {
-                                    Button("Reply all") { compose = Draft.reply(to: message, all: true, accountEmail: store.settings?.account.email ?? "") }
-                                    Button("Forward") { var draft = Draft(); draft.subject = "Fwd: \(message.subject)"; draft.body = "\n\n---------- Forwarded message ----------\nFrom: \(message.sender) <\(message.senderEmail)>\nSubject: \(message.subject)\n\n\(message.text)"; compose = draft }
-                                } label: { Image(systemName: "ellipsis").frame(width: 44, height: 36) }.accessibilityLabel("Reply all or forward")
-                            }.buttonStyle(.bordered).padding(.top, 8)
+                            if conversation.messages.count > 1 {
+                                HStack {
+                                    Button { compose = Draft.reply(to: message) } label: { Label("Reply", systemImage: "arrowshape.turn.up.left") }
+                                    replyMenu(message)
+                                }.buttonStyle(.bordered).padding(.top, 4)
+                            }
                         }
-                        Divider()
+                        if conversation.messages.count > 1 { Divider() }
                     }
                 } else if error == nil { ProgressView().frame(maxWidth: .infinity).padding(60) }
-                if let error { ContentUnavailableView("Couldn't load message", systemImage: "exclamationmark.circle", description: Text(error)); Button("Retry") { Task { await load() } } }
+                if let error {
+                    ContentUnavailableView("Couldn't load message", systemImage: "exclamationmark.circle", description: Text(error))
+                    Button("Retry") { Task { await load() } }
+                }
             }.padding(.horizontal, 20).padding(.bottom, 24)
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button { Task { await move("archive") } } label: { Image(systemName: "archivebox") }.accessibilityLabel("Archive conversation")
-                Button { Task { await move("trash") } } label: { Image(systemName: "trash") }.accessibilityLabel("Move conversation to Trash")
-                Menu {
-                    Button("Mark unread", systemImage: "envelope.badge") { Task { await move("unread") } }
-                    Button("Move to Inbox", systemImage: "tray") { Task { await move("inbox") } }
-                    Button(isSpam ? "Not spam" : "Report spam", systemImage: isSpam ? "checkmark.shield" : "exclamationmark.octagon") { Task { await move(isSpam ? "not_spam" : "spam") } }
-                    Button("Snooze until tomorrow", systemImage: "clock") { Task { await store.action(id, "snooze", until: Int64(Date().addingTimeInterval(86400).timeIntervalSince1970 * 1000)); if store.error == nil { dismiss() } } }
-                    if let labels = store.settings?.labels.filter({ $0.kind == "user" }) {
-                        ForEach(labels) { label in
-                            let applied = conversation?.labels.contains { $0.id == label.id } ?? false
-                            Button("\(applied ? "Remove" : "Add") \(label.name)") { Task { await store.action(id, applied ? "unlabel" : "label", value: label.id); await load() } }
-                        }
-                    }
-                } label: { Image(systemName: "ellipsis") }.accessibilityLabel("More conversation actions")
-            }
-        }
+        .background(Color(uiColor: .systemBackground))
+        .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) { header }
         .task(id: id) { await load() }
         .refreshable { await load() }
         .sheet(item: $compose) { ComposeView(initial: $0) }
         .sheet(item: $share) { ShareSheet(url: $0.url) }
+        .tint(.mailAction)
+    }
+
+    private var header: some View {
+        MailHeader {
+            MailIconButton(symbol: "chevron.left", label: "Back to inbox") { dismiss() }
+            if let message = latestMessage {
+                Menu {
+                    Text(message.senderEmail)
+                    Text("To: \(message.recipients)")
+                    if !message.cc.isEmpty { Text("Cc: \(message.cc)") }
+                    Text(Date(timeIntervalSince1970: message.receivedAt / 1000), format: .dateTime.month(.abbreviated).day().hour().minute())
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(message.sender.isEmpty ? message.senderEmail : message.sender).font(.subheadline.weight(.semibold)).lineLimit(1)
+                        Text("to \(message.recipients)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                }.foregroundStyle(.primary).accessibilityLabel("Message details for \(message.sender.isEmpty ? message.senderEmail : message.sender)")
+            } else { Spacer() }
+            MailIconButton(symbol: "archivebox", label: "Archive conversation") { Task { await move("archive") } }
+                .disabled(conversation == nil)
+            MailIconButton(symbol: "arrowshape.turn.up.left", label: "Reply") {
+                if let message = latestMessage { compose = Draft.reply(to: message) }
+            }.disabled(latestMessage == nil)
+            Menu {
+                Button("Move to Trash", systemImage: "trash", role: .destructive) { Task { await move("trash") } }
+                if let message = latestMessage {
+                    Button("Reply all", systemImage: "arrowshape.turn.up.left.2") { compose = Draft.reply(to: message, all: true, accountEmail: store.settings?.account.email ?? "") }
+                    Button("Forward", systemImage: "arrowshape.turn.up.right") { forward(message) }
+                }
+                Button("Mark unread", systemImage: "envelope.badge") { Task { await move("unread") } }
+                let starred = conversation?.messages.contains { $0.labels.contains("STARRED") } == true
+                Button(starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star") {
+                    Task { await store.action(id, starred ? "unstar" : "star"); await load() }
+                }
+                Button("Move to Inbox", systemImage: "tray") { Task { await move("inbox") } }
+                Button(isSpam ? "Not spam" : "Report spam", systemImage: isSpam ? "checkmark.shield" : "exclamationmark.octagon") { Task { await move(isSpam ? "not_spam" : "spam") } }
+                Button("Snooze until tomorrow", systemImage: "clock") {
+                    Task { await store.action(id, "snooze", until: Int64(Date().addingTimeInterval(86400).timeIntervalSince1970 * 1000)); if store.error == nil { dismiss() } }
+                }
+                if let labels = store.settings?.labels.filter({ $0.kind == "user" }) {
+                    ForEach(labels) { label in
+                        let applied = conversation?.labels.contains { $0.id == label.id } ?? false
+                        Button("\(applied ? "Remove" : "Add") \(label.name)") {
+                            Task { await store.action(id, applied ? "unlabel" : "label", value: label.id); await load() }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+            }.foregroundStyle(Color.mailAction).accessibilityLabel("More conversation actions").disabled(conversation == nil)
+        }
+    }
+
+    private func messageHeading(_ message: MailMessage) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(message.sender.isEmpty ? message.senderEmail : message.sender).font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(Date(timeIntervalSince1970: message.receivedAt / 1000), format: .dateTime.month(.abbreviated).day()).font(.caption2).foregroundStyle(.secondary)
+            }
+            Text(message.senderEmail).font(.caption).foregroundStyle(.secondary)
+            Text("to \(message.recipients)").font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        }
+    }
+
+    private func replyMenu(_ message: MailMessage) -> some View {
+        Menu {
+            Button("Reply all") { compose = Draft.reply(to: message, all: true, accountEmail: store.settings?.account.email ?? "") }
+            Button("Forward") { forward(message) }
+        } label: { Image(systemName: "ellipsis").frame(minWidth: 44, minHeight: 44) }.accessibilityLabel("Reply all or forward")
+    }
+
+    private func forward(_ message: MailMessage) {
+        var draft = Draft()
+        draft.subject = "Fwd: \(message.subject)"
+        draft.body = "\n\n---------- Forwarded message ----------\nFrom: \(message.sender) <\(message.senderEmail)>\nSubject: \(message.subject)\n\n\(message.text)"
+        compose = draft
     }
     private func load() async {
         do {

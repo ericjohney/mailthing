@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0573C350D87928F528F8510C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3FB66870F6A0D4DF83690B4E /* Assets.xcassets */; };
 		0C6705DA0D9FFAA85AA99243 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BFDE998B9D73832D063B94F /* Models.swift */; };
+		0DEA2CCCEE1539AB628D0193 /* MailDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 154004C8C40C460F0945D17C /* MailDesign.swift */; };
 		24A4C210255FE92BB771C06E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A2D5934F17924A85AECF69 /* SettingsView.swift */; };
 		4FD0557CAFD37C711039DDFB /* MailthingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C322426BBCAA9F44D9D12C7 /* MailthingTests.swift */; };
 		50311835915BE04C7470E45E /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08B856F8015DA04E424C08B0 /* ConversationView.swift */; };
@@ -34,6 +35,7 @@
 		08B856F8015DA04E424C08B0 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
 		0C322426BBCAA9F44D9D12C7 /* MailthingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailthingTests.swift; sourceTree = "<group>"; };
 		1513F560325D8AAD13C7CC85 /* ComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeView.swift; sourceTree = "<group>"; };
+		154004C8C40C460F0945D17C /* MailDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailDesign.swift; sourceTree = "<group>"; };
 		3FB66870F6A0D4DF83690B4E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		42FBF20D6F4D058E2569E930 /* API.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API.swift; sourceTree = "<group>"; };
 		6BFDE998B9D73832D063B94F /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -84,6 +86,7 @@
 				08B856F8015DA04E424C08B0 /* ConversationView.swift */,
 				72F08A0474DF0C96DC9E0E94 /* InboxView.swift */,
 				8ACAB084DC3CE91A4832267A /* Info.plist */,
+				154004C8C40C460F0945D17C /* MailDesign.swift */,
 				B01E41E891069A052BFB5B02 /* MailStore.swift */,
 				71C05ABCC5900D1E93A15AAD /* Mailthing.entitlements */,
 				A916F68601CFFD0EE4ACBC25 /* MailthingApp.swift */,
@@ -199,6 +202,7 @@
 				5E2B4E04B141644E1E1501BC /* ComposeView.swift in Sources */,
 				50311835915BE04C7470E45E /* ConversationView.swift in Sources */,
 				BC118B2CCDC6218028469C7E /* InboxView.swift in Sources */,
+				0DEA2CCCEE1539AB628D0193 /* MailDesign.swift in Sources */,
 				5A48DE1A5726755A18B55AD8 /* MailStore.swift in Sources */,
 				8EDC64D9B44ABF17487F58A1 /* MailthingApp.swift in Sources */,
 				0C6705DA0D9FFAA85AA99243 /* Models.swift in Sources */,
@@ -290,7 +294,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MAILTHING_SERVER_URL = "https://mailthing.ericj5.com";
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -404,7 +408,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MAILTHING_SERVER_URL = "https://mailthing.ericj5.com";
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

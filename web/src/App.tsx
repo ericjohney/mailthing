@@ -350,10 +350,17 @@ export function App() {
             href="#label=INBOX"
             onClick={() => setQuery('')}
           >
-            <span>
-              mailthing<span className="brand-dot">.</span>
+            <img
+              className="brand-mark"
+              src="/brand/mailthing-mark.svg"
+              width="32"
+              height="32"
+              alt=""
+            />
+            <span className="brand-copy">
+              <span>mailthing</span>
+              <small>PERSONAL MAIL</small>
             </span>
-            <small>PERSONAL MAIL</small>
           </a>
         </div>
         <div className="search-wrap">
