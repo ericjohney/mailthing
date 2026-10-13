@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createPrivateKey, sign } from 'node:crypto';
 import { join } from 'node:path';
+import { validateReleaseVersion } from './version.mjs';
 
 const keyId = process.env.ASC_KEY_ID;
 const issuer = process.env.ASC_ISSUER_ID;
@@ -56,12 +57,25 @@ if (command === 'setup') {
   if (!owner) console.log('Add Eric through TestFlight → Me → Invite Testers. Internal testers must be selected as App Store Connect users, not copied from another app’s beta tester records.');
 } else {
   if (!app) throw new Error('Mailthing has no App Store Connect app record yet. Run setup.');
-  const builds = (await api(`builds?filter[app]=${app.id}&sort=-uploadedDate&limit=10`)).data;
-  if (command === 'allocate') {
-    const floor = Number(process.env.BUILD_NUMBER_FLOOR || 1);
-    const history = builds.map(b => Number(b.attributes.version)).filter(Number.isSafeInteger);
-    const number = Math.max(floor, ...history.map(n => n + 1));
-    if (!Number.isSafeInteger(number) || number < 1) throw new Error('Invalid build number');
-    console.log(number);
-  } else console.log(JSON.stringify({ appId: app.id, builds: builds.map(b => ({ id: b.id, build: b.attributes.version, state: b.attributes.processingState, expired: b.attributes.expired })) }, null, 2));
+  if (command === 'validate-version') {
+    const versions = [];
+    let next = `https://api.appstoreconnect.apple.com/v1/preReleaseVersions?filter[app]=${app.id}&limit=200`;
+    while (next) {
+      const page = await api(next.replace('https://api.appstoreconnect.apple.com/v1/', ''));
+      versions.push(...page.data.filter(v => v.attributes.platform === 'IOS').map(v => v.attributes.version));
+      next = page.links?.next;
+    }
+    validateReleaseVersion(process.env.RELEASE_VERSION, versions);
+    console.log(`Mailthing release version ${process.env.RELEASE_VERSION} validated against App Store Connect`);
+  } else {
+    const builds = (await api(`builds?filter[app]=${app.id}&sort=-uploadedDate&limit=10`)).data;
+    if (command === 'allocate') {
+      const floor = Number(process.env.BUILD_NUMBER_FLOOR || 1);
+      const history = builds.map(b => Number(b.attributes.version)).filter(Number.isSafeInteger);
+      const number = Math.max(floor, ...history.map(n => n + 1));
+      if (!Number.isSafeInteger(number) || number < 1) throw new Error('Invalid build number');
+      console.log(number);
+    } else console.log(JSON.stringify({ appId: app.id, builds: builds.map(b => ({ id: b.id, build: b.attributes.version, state: b.attributes.processingState, expired: b.attributes.expired })) }, null, 2));
+  }
+
 }

@@ -131,10 +131,15 @@ address, and uploads with `altool`. It preserves the user's existing keychain
 search list. `apple.mjs allocate` selects a build number above Apple's history;
 `apple.mjs status` reports processing status.
 
+The release defaults to **1.0.2**. Marketing versions must never be lower than
+a version already uploaded to App Store Connect, even when the build number
+is higher. The release preflight checks this before signing and verifies both
+version fields in the archived app before upload.
+
 The **iOS TestFlight Release** workflow is manually dispatched:
 
 ```sh
-gh workflow run ios-release.yml --ref master -f version=1.0.0
+gh workflow run ios-release.yml --ref master -f version=1.0.2
 ```
 
 Required Mailthing repository Actions secrets:

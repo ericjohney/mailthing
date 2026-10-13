@@ -5,9 +5,10 @@ cd "$(dirname "$0")/.."
 : "${SIGNING_DIRECTORY:?Set the private directory holding the Mailthing profile and distribution certificate}"
 : "${ASC_KEY_ID:?}" "${ASC_ISSUER_ID:?}" "${ASC_KEY_PATH:?}"
 : "${BUILD_NUMBER:?Allocate a new App Store Connect build number}"
-RELEASE_VERSION=${RELEASE_VERSION:-1.0.0}
+export RELEASE_VERSION=${RELEASE_VERSION:-1.0.2}
 [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'Invalid build number' >&2; exit 1; }
 [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release version' >&2; exit 1; }
+node scripts/apple.mjs validate-version
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
 task_temp=$(mktemp -d "$SIGNING_DIRECTORY/keychain.XXXXXX")
 keychain="$task_temp/signing.keychain-db"
@@ -65,7 +66,7 @@ xcodebuild -exportArchive -archivePath "$archive" -exportPath "$export_path" -ex
 app="$archive/Products/Applications/Mailthing.app"
 codesign --verify --deep --strict "$app"
 codesign -d --entitlements :- "$app" > "$task_temp/entitlements.plist" 2>/dev/null
-ENTITLEMENTS="$task_temp/entitlements.plist" APP_PATH="$app" BUILD_NUMBER="$BUILD_NUMBER" python3 - <<'PY'
+ENTITLEMENTS="$task_temp/entitlements.plist" APP_PATH="$app" BUILD_NUMBER="$BUILD_NUMBER" RELEASE_VERSION="$RELEASE_VERSION" python3 - <<'PY'
 import os, plistlib
 ent = plistlib.load(open(os.environ['ENTITLEMENTS'], 'rb'))
 info = plistlib.load(open(os.path.join(os.environ['APP_PATH'], 'Info.plist'), 'rb'))
@@ -74,6 +75,7 @@ assert ent['application-identifier'] == '27ZLS4MK3J.com.ericjohney.mailthing'
 assert ent.get('get-task-allow', False) is False
 assert info['CFBundleIdentifier'] == 'com.ericjohney.mailthing'
 assert info['CFBundleVersion'] == os.environ['BUILD_NUMBER']
+assert info['CFBundleShortVersionString'] == os.environ['RELEASE_VERSION']
 assert info['MailthingServerURL'] == 'https://mailthing.ericj5.com'
 PY
 mkdir -p "$task_temp/private_keys"
