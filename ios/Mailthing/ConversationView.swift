@@ -10,6 +10,7 @@ struct ConversationView: View {
     @State private var compose: Draft?
     @State private var share: SharedFile?
     @State private var downloading = false
+    private var isSpam: Bool { conversation?.messages.contains { $0.labels.contains("SPAM") } == true }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -65,7 +66,7 @@ struct ConversationView: View {
                 Menu {
                     Button("Mark unread", systemImage: "envelope.badge") { Task { await move("unread") } }
                     Button("Move to Inbox", systemImage: "tray") { Task { await move("inbox") } }
-                    Button("Report spam", systemImage: "exclamationmark.octagon") { Task { await move("spam") } }
+                    Button(isSpam ? "Not spam" : "Report spam", systemImage: isSpam ? "checkmark.shield" : "exclamationmark.octagon") { Task { await move(isSpam ? "not_spam" : "spam") } }
                     Button("Snooze until tomorrow", systemImage: "clock") { Task { await store.action(id, "snooze", until: Int64(Date().addingTimeInterval(86400).timeIntervalSince1970 * 1000)); if store.error == nil { dismiss() } } }
                     if let labels = store.settings?.labels.filter({ $0.kind == "user" }) {
                         ForEach(labels) { label in

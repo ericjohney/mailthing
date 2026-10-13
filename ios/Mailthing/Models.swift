@@ -8,7 +8,31 @@ struct Settings: Codable {
     var labels: [MailLabel]
     var counts: [String: MailCount]
     var outboundConfigured: Bool
+    var sortingConfigured: Bool?
+    var sortingModel: String?
+    var spamThreshold: Double?
 }
+struct SortingMemory: Codable, Identifiable {
+    var labelId: String
+    var name: String
+    var kind: String
+    var guidance: String
+    var exampleCount: Int
+    var examples: [SortingExample]
+    var id: String { labelId }
+    var isSpam: Bool { labelId == "SPAM" }
+}
+struct SortingExample: Codable {
+    var included: Bool
+    var sender: String
+    var subject: String
+    var snippet: String
+}
+struct SortingMemoryUpdate: Encodable {
+    var guidance: String
+    var clearExamples = false
+}
+
 struct MailThread: Codable, Identifiable, Hashable {
     var id: String; var subject: String; var sender: String; var senderEmail: String
     var snippet: String; var receivedAt: Double; var count: Int; var unread: Int

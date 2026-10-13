@@ -20,6 +20,24 @@ Sending requires an outbound SMTP relay configured on the server. If it is not
 configured, the app disables Send and explains that drafts can still be saved.
 The app never presents invented messages as mailbox data.
 
+## Sorting guidance and memory
+
+**Account → Settings → Mail sorting** shows whether the server's sorter is
+configured, its model and automatic spam confidence cutoff. **Sorting memory**
+lists inbox categories, custom labels and Spam. Tap one to edit and save its
+guidance, inspect recent included/excluded examples, or clear remembered examples
+while keeping the guidance. Pull to refresh the list. Guidance accepts up to
+2,000 Unicode scalar characters, matching the server's limit.
+
+Changes use the same server memory as the web app and affect subsequently
+processed mail. Applying/removing labels teaches custom-label memory. **Report
+spam / Not spam** in the conversation menu teaches Spam memory; moving existing
+spam to Inbox also teaches a not-spam correction. Automatic predictions never
+teach themselves. A new label becomes eligible for automatic sorting once it
+has guidance or positive examples. Create labels and deterministic filters in
+the web app. Model, connection credentials and spam cutoff remain configured
+on the server; the mobile app never receives provider credentials.
+
 ## Build and test
 
 Install Xcode 26.6 and XcodeGen on a Mac:

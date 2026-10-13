@@ -40,6 +40,13 @@ struct MailAPI {
         if let until { body["until"] = until }
         let _: EmptyReply = try await request("actions", method: "POST", body: JSONSerialization.data(withJSONObject: body))
     }
+    func sortingMemories() async throws -> [SortingMemory] {
+        try await request("sorting/memories")
+    }
+    func saveSortingMemory(_ id: String, guidance: String, clearExamples: Bool = false) async throws {
+        let update = SortingMemoryUpdate(guidance: guidance, clearExamples: clearExamples)
+        let _: EmptyReply = try await request("sorting/memories/\(id)", method: "PUT", body: JSONEncoder.mailthing.encode(update))
+    }
     func save(_ draft: Draft) async throws {
         let _: EmptyReply = try await request("drafts", method: "POST", body: JSONEncoder.mailthing.encode(draft))
     }

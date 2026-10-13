@@ -18,6 +18,36 @@ final class MailthingTests: XCTestCase {
         XCTAssertEqual(thread.date.timeIntervalSince1970, 1700000000)
         XCTAssertEqual(thread.senderEmail, "sam@example.net")
     }
+    func testSortingSettingsDecodeAndRemainCompatibleWithOlderServers() throws {
+        let base = #"{"account":{"name":"Eric","email":"eric@example.com"},"labels":[],"counts":{},"outbound_configured":false}"#
+        let older = try JSONDecoder.mailthing.decode(Settings.self, from: Data(base.utf8))
+        XCTAssertNil(older.sortingConfigured)
+        let current = String(base.dropLast()) + #","sorting_configured":true,"sorting_model":"gpt-6-luna","spam_threshold":0.95}"#
+        let settings = try JSONDecoder.mailthing.decode(Settings.self, from: Data(current.utf8))
+        XCTAssertEqual(settings.sortingConfigured, true)
+        XCTAssertEqual(settings.sortingModel, "gpt-6-luna")
+        XCTAssertEqual(settings.spamThreshold, 0.95)
+    }
+    func testSortingMemoryDecodesGuidanceAndBothCorrectionKinds() throws {
+        let json = #"[{"label_id":"SPAM","name":"Spam","kind":"system","guidance":"Unsolicited scams","example_count":2,"examples":[{"included":true,"sender":"junk@example.com","subject":"A scam","snippet":"Bad mail"},{"included":false,"sender":"shop@example.com","subject":"A newsletter","snippet":"Legitimate mail"}]}]"#
+        let memories = try JSONDecoder.mailthing.decode([SortingMemory].self, from: Data(json.utf8))
+        let memory = try XCTUnwrap(memories.first)
+        XCTAssertEqual(memory.id, "SPAM")
+        XCTAssertTrue(memory.isSpam)
+        XCTAssertEqual(memory.guidance, "Unsolicited scams")
+        XCTAssertEqual(memory.exampleCount, 2)
+        XCTAssertTrue(memory.examples[0].included)
+        XCTAssertFalse(memory.examples[1].included)
+    }
+    func testSortingGuidanceAndClearExamplesUseTheServerWireFormat() throws {
+        let update = SortingMemoryUpdate(guidance: "Travel receipts", clearExamples: true)
+        let data = try JSONEncoder.mailthing.encode(update)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["guidance"] as? String, "Travel receipts")
+        XCTAssertEqual(json["clear_examples"] as? Bool, true)
+        XCTAssertNil(json["clearExamples"])
+    }
+
     func testDraftWireFormatMatchesServerAndRetainsAttachment() throws {
         var draft = Draft(); draft.to = "sam@example.net"; draft.inReplyTo = "<original@example.net>"
         draft.attachments = [.init(name: "note.txt", contentType: "text/plain", data: Data("hi".utf8).base64EncodedString())]
