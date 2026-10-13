@@ -14,6 +14,8 @@ export interface Settings {
   labels: Label[];
   counts: Record<string, { total: number; unread: number }>;
   outbound_configured: boolean;
+  sorting_configured?: boolean;
+  sorting_model?: string | null;
   smtp_port: number;
   max_message_bytes: number;
 }
@@ -106,3 +108,12 @@ export const emptyDraft = (): Draft => ({
   attachments: [],
   updated_at: Date.now(),
 });
+
+export interface SortingMemory {
+  label_id: string;
+  name: string;
+  kind: 'system' | 'user';
+  guidance: string;
+  example_count: number;
+  examples: { included: boolean; sender: string; subject: string; snippet: string }[];
+}

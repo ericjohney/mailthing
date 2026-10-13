@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { api, encodeFile, mutate } from './api';
 import { categories, userLabels } from './mailbox/navigation';
-import type { PipelineStatus, Rule, Settings as SettingsData } from './types';
+import type { PipelineStatus, Rule, SortingMemory, Settings as SettingsData } from './types';
 import {
   Button,
   Field,
@@ -46,6 +46,7 @@ export function Settings({
   const [labelName, setLabelName] = useState('');
   const [color, setColor] = useState('#65705f');
   const [rules, setRules] = useState<Rule[]>([]);
+  const [memories, setMemories] = useState<SortingMemory[]>([]);
   const [pipeline, setPipeline] = useState<PipelineStatus>();
   const [saving, setSaving] = useState(false);
   const { preference, setPreference } = useTheme();
@@ -71,6 +72,10 @@ export function Settings({
     }
   }
   useEffect(() => {
+    if (tab === 'sorting')
+      api<SortingMemory[]>('/sorting/memories')
+        .then(setMemories)
+        .catch((error) => report(error.message));
     if (tab === 'rules')
       api<Rule[]>('/rules')
         .then(setRules)
@@ -87,6 +92,7 @@ export function Settings({
   const tabs = [
     { id: 'general', label: 'General', icon: UserRound },
     { id: 'labels', label: 'Labels', icon: Tag },
+    { id: 'sorting', label: 'Sorting memory', icon: Tag },
     { id: 'rules', label: 'Filters & rules', icon: Filter },
     { id: 'pipeline', label: 'Processing', icon: Activity },
     { id: 'server', label: 'Connections', icon: Server },
@@ -226,6 +232,92 @@ export function Settings({
                 <p className="muted">No labels yet. Create your first one above.</p>
               )}
             </div>
+          </>
+        )}
+        {tab === 'sorting' && (
+          <>
+            <SectionHeading
+              title="Teach your mail sorter"
+              description="Describe what belongs in each category or label. Applying or removing labels teaches future sorting; your filters still take precedence."
+            />
+            <p className="muted">
+              {settings.sorting_configured
+                ? `Connected · ${settings.sorting_model}`
+                : 'LLM sorting is disabled until your server connection is configured.'}{' '}
+              New labels are sorted automatically once you add guidance or apply them to a
+              conversation.
+            </p>
+            {memories.map((memory) => (
+              <form
+                key={memory.label_id}
+                className="sorting-memory"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  run(async () => {
+                    await mutate(
+                      `/sorting/memories/${memory.label_id}`,
+                      { guidance: memory.guidance },
+                      'PUT',
+                    );
+                    setMemories(await api('/sorting/memories'));
+                  }, 'Sorting guidance saved');
+                }}
+              >
+                <Field label={memory.name}>
+                  <textarea
+                    value={memory.guidance}
+                    maxLength={2000}
+                    rows={3}
+                    placeholder="What kind of mail belongs here?"
+                    onChange={(event) =>
+                      setMemories(
+                        memories.map((item) =>
+                          item.label_id === memory.label_id
+                            ? { ...item, guidance: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                </Field>
+                <div className="sorting-memory-actions">
+                  <Button type="submit" variant="secondary" disabled={saving}>
+                    Save guidance
+                  </Button>
+                  <span className="muted small">{memory.example_count} remembered examples</span>
+                  {memory.example_count > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={saving}
+                      onClick={() =>
+                        run(async () => {
+                          await mutate(
+                            `/sorting/memories/${memory.label_id}`,
+                            { guidance: memory.guidance, clear_examples: true },
+                            'PUT',
+                          );
+                          setMemories(await api('/sorting/memories'));
+                        }, 'Remembered examples cleared')
+                      }
+                    >
+                      Clear examples
+                    </Button>
+                  )}
+                </div>
+                {memory.examples.length > 0 && (
+                  <details>
+                    <summary>Recent examples</summary>
+                    {memory.examples.map((example, index) => (
+                      <p className="muted small" key={index}>
+                        {example.included ? 'Belongs here' : 'Doesn’t belong here'} ·{' '}
+                        {example.sender} · {example.subject}
+                      </p>
+                    ))}
+                  </details>
+                )}
+              </form>
+            ))}
           </>
         )}
         {tab === 'rules' && (
@@ -452,6 +544,28 @@ export function Settings({
         {tab === 'server' && (
           <>
             <h3>Mail connections</h3>
+            <div className="connection-card">
+              <div className="connection-icon">
+                <Tag size={23} />
+              </div>
+              <div>
+                <strong>LLM mail sorting</strong>
+                <p>
+                  {settings.sorting_configured
+                    ? `LiteLLM · ${settings.sorting_model}`
+                    : 'Waiting for your server connection'}
+                </p>
+                <small>
+                  Uses sorting guidance and remembered corrections. Falls back to basic sorting if
+                  unavailable.
+                </small>
+              </div>
+              {settings.sorting_configured ? (
+                <CheckCircle2 className="positive" size={20} />
+              ) : (
+                <Circle size={20} />
+              )}
+            </div>
             <div className="connection-card">
               <div className="connection-icon">
                 <Server size={23} />

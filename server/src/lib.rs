@@ -9,6 +9,7 @@ pub mod pipeline;
 pub mod push;
 pub mod search;
 pub mod smtp;
+pub mod sorting;
 
 use config::Config;
 use sqlx::SqlitePool;
@@ -23,11 +24,17 @@ pub struct AppState {
     pub events: broadcast::Sender<()>,
     pub pipeline: Arc<pipeline::Pipeline>,
     pub shutdown: watch::Sender<bool>,
+    pub sorter: Option<Arc<sorting::Sorter>>,
 }
 
 impl AppState {
     pub fn new(pool: SqlitePool, config: Config) -> Self {
+        let sorter = config
+            .llm
+            .clone()
+            .map(|config| Arc::new(sorting::Sorter::new(config)));
         Self {
+            sorter,
             pool,
             config: Arc::new(config),
             wake: Arc::new(Notify::new()),
@@ -73,7 +80,13 @@ impl AppState {
                         if *stop.borrow() {
                             break;
                         }
-                        match pipeline::process_next(&state.pool, state.pipeline.clone()).await {
+                        match pipeline::process_next_with_sorter(
+                            &state.pool,
+                            state.pipeline.clone(),
+                            state.sorter.as_deref(),
+                        )
+                        .await
+                        {
                             Ok(true) => {
                                 let _ = state.events.send(());
                                 continue;

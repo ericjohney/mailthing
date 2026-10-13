@@ -28,6 +28,7 @@ pub struct ProcessedMail {
     pub labels: Vec<String>,
     pub attachments: Vec<Attachment>,
     pub headers: Vec<(String, String)>,
+    pub sorting: Option<crate::sorting::SortingResult>,
 }
 
 impl ProcessedMail {
@@ -412,6 +413,12 @@ pub async fn persist(
         sqlx::query("INSERT OR IGNORE INTO message_labels(message_id,label_id) SELECT ?,id FROM labels WHERE id=?")
             .bind(id).bind(label).execute(&mut *tx).await?;
     }
+    if let Some(result) = &mail.sorting {
+        sqlx::query("INSERT OR REPLACE INTO sorting_results(message_id,model,category,label_ids,classified_at) VALUES(?,?,?,?,?)")
+            .bind(id).bind(&result.model).bind(&result.decision.category)
+            .bind(serde_json::to_string(&result.decision.label_ids)?).bind(db::now())
+            .execute(&mut *tx).await?;
+    }
     sqlx::query("UPDATE jobs SET status='completed',completed_at=?,duration_ms=?,error=NULL,raw=X'' WHERE id=?")
         .bind(db::now()).bind(duration_ms).bind(id).execute(&mut *tx).await?;
     if inserted {
@@ -423,6 +430,14 @@ pub async fn persist(
 }
 
 pub async fn process_next(pool: &SqlitePool, pipeline: Arc<Pipeline>) -> Result<bool> {
+    process_next_with_sorter(pool, pipeline, None).await
+}
+
+pub async fn process_next_with_sorter(
+    pool: &SqlitePool,
+    pipeline: Arc<Pipeline>,
+    sorter: Option<&crate::sorting::Sorter>,
+) -> Result<bool> {
     let job = sqlx::query("UPDATE jobs SET status='processing',attempts=attempts+1 WHERE id=(SELECT id FROM jobs WHERE status='pending' ORDER BY received_at LIMIT 1) RETURNING id,raw,envelope,import_state,received_at,attempts")
         .fetch_optional(pool).await?;
     let Some(job) = job else {
@@ -435,14 +450,26 @@ pub async fn process_next(pool: &SqlitePool, pipeline: Arc<Pipeline>) -> Result<
     let started = std::time::Instant::now();
     let result: Result<()> = async {
         let envelope: Envelope = serde_json::from_str(job.get("envelope"))?;
+        let imported: Option<ImportState> = import_state.as_deref().map(serde_json::from_str).transpose()?;
         let rules = db::rules(pool).await?;
         let raw_clone = raw.clone();
         let envelope_clone = envelope.clone();
-        let mut parsed =
-            tokio::task::spawn_blocking(move || pipeline.run(&raw_clone, &envelope_clone, &rules))
-                .await??;
-        if let Some(state) = import_state.as_deref() {
-            let state: ImportState = serde_json::from_str(state)?;
+        let parsing_rules = if sorter.is_some() { Vec::new() } else { rules.clone() };
+        let mut parsed = tokio::task::spawn_blocking(move || {
+            pipeline.run(&raw_clone, &envelope_clone, &parsing_rules)
+        }).await??;
+        if let Some(sorter) = sorter {
+            let imported_excluded = imported.as_ref().and_then(|s| s.system_labels.as_ref())
+                .is_some_and(|ids| ids.iter().any(|id| [labels::SPAM, labels::SENT].contains(&id.as_str())));
+            if !imported_excluded && !parsed.has_label(labels::SPAM) && !parsed.has_label(labels::SENT)
+                && let Err(error) = sorter.classify(pool, &mut parsed).await {
+                tracing::warn!(job_id=%id, %error, "LLM sorting unavailable; retaining heuristic labels");
+            }
+            let mut context = PipelineContext { raw: &raw, envelope: &envelope, rules: &rules, mail: parsed };
+            RulesStage.run(&mut context)?;
+            parsed = context.mail;
+        }
+        if let Some(state) = imported {
             apply_import_state(&mut parsed, &state);
             received_at = state.received_at.unwrap_or(received_at);
         }

@@ -3,6 +3,7 @@ use std::{env, net::IpAddr, path::PathBuf};
 
 #[derive(Clone, Debug)]
 pub struct Config {
+    pub llm: Option<crate::sorting::SortingConfig>,
     pub web_host: IpAddr,
     pub port: u16,
     pub smtp_host: IpAddr,
@@ -33,6 +34,7 @@ impl Config {
                 .unwrap_or_else(|| default.into())
         }
         let config = Self {
+            llm: crate::sorting::SortingConfig::from_env()?,
             web_host: get("WEB_HOST", "127.0.0.1").parse()?,
             port: get("PORT", "9005").parse()?,
             smtp_host: get("SMTP_HOST", "0.0.0.0").parse()?,

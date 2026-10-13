@@ -54,7 +54,7 @@ after:2026-01-01 before:2026-02-01
 coffee in:anywhere
 ```
 
-Dates are evaluated at midnight UTC. Search excludes Spam and Trash unless `in:anywhere`, `in:spam`, or `in:trash` is included. `label:` matches label names case-insensitively, with hyphens standing in for spaces. Category assignment is a lightweight heuristic, overridden by your filters. Existing spam flags are honored; the server does not claim to perform antivirus scanning or statistical spam detection.
+Dates are evaluated at midnight UTC. Search excludes Spam and Trash unless `in:anywhere`, `in:spam`, or `in:trash` is included. `label:` matches label names case-insensitively, with hyphens standing in for spaces. Category assignment uses lightweight heuristics by default, or an optional LiteLLM classifier when configured. Your filters override either classifier. Existing spam flags are honored; the server does not claim to perform antivirus scanning or statistical spam detection.
 
 The React interface uses a shared [design system](web/src/design-system/README.md). Semantic palette, typography, spacing, and control tokens live in `web/src/design-system/tokens.css`; reusable controls share hover, focus, and disabled behavior. Screen styles consume those tokens, so new palettes or density changes can share the same components. Appearance is configurable in Settings → General.
 
@@ -143,6 +143,25 @@ python3 scripts/import-gmail.py --user you@gmail.com --query 'newer_than:2m' --u
 ```
 
 Gmail's inbox tabs are not exposed over IMAP, so Mailthing assigns its own categories.
+
+## LLM sorting and tag memory
+
+Set these server environment variables together to enable sorting through LiteLLM (or another OpenAI-compatible proxy):
+
+```dotenv
+LLM_BASE_URL=http://litellm.apps.svc.cluster.local:4000/v1
+LLM_API_KEY=<private proxy key>
+LLM_MODEL=gpt-6-luna
+LLM_TIMEOUT_SECONDS=30
+```
+
+`LLM_MODEL` is the exact alias advertised by your proxy; it is never hardcoded in the sorter. Keep the key in your deployment's secret store. Leaving all three connection variables unset disables LLM sorting; incomplete configuration fails startup. The timeout is configurable from 1–120 seconds.
+
+The classifier chooses one inbox category and may add your custom labels. **Settings → Sorting memory** stores editable guidance for each category and label. New custom labels become eligible for automatic sorting after you add guidance or explicitly apply them to a conversation. Applying/removing labels and moving conversations to a category remembers positive/negative examples. Each label retains at most 12 message examples; the four most recent are supplied to the model. You can inspect recent examples or clear all examples for a label in Settings. Deleting a message or label also deletes its associated examples. Model predictions, imports, and automatic filters never teach the memory; only your explicit corrections do. Guidance is not automatically rewritten by the model.
+
+Requests include sender, subject, selected mailing-list headers, and at most 6,000 characters of plain-text body, plus label guidance and bounded example excerpts. Attachments and raw HTML are not sent. Treat the chosen provider as a recipient of these excerpts. Mail content is explicitly treated as untrusted data; the classifier has no tools and its output can only assign known categories and eligible custom labels. Spam and sent mail skip classification. Requests stream for subscription-backed proxy compatibility, with bounded responses and strict result validation. Timeouts, invalid output, and provider failures keep the heuristic result and log a warning without exposing provider response bodies or keys. Mailbox rules and imported state still run afterward and take precedence.
+
+Sorting applies to subsequently processed incoming mail and imports; existing stored mail is not reclassified. Successful model decisions are recorded in `sorting_results` alongside the final message transaction for troubleshooting.
 
 ## Storage and processing architecture
 

@@ -5,6 +5,7 @@ use tempfile::TempDir;
 pub async fn setup() -> (TempDir, AppState) {
     let temp = tempfile::tempdir().unwrap();
     let config = Config {
+        llm: None,
         web_host: "127.0.0.1".parse().unwrap(),
         port: 0,
         smtp_host: "127.0.0.1".parse().unwrap(),

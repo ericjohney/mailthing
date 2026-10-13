@@ -260,6 +260,7 @@ export function App() {
         unread: 'Marked as unread',
         label: 'Label applied',
         unlabel: 'Label removed',
+        category: 'Category updated',
         snooze: 'Snoozed until tomorrow',
         inbox: 'Moved to Inbox',
         delete: 'Permanently deleted',
@@ -662,6 +663,15 @@ export function App() {
                     </IconButton>
                     {dropdown === 'labels' && (
                       <div className="dropdown">
+                        <span className="dropdown-heading">Move to category</span>
+                        {categories.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => doAction('category', undefined, item.id)}
+                          >
+                            {item.name}
+                          </button>
+                        ))}
                         <span className="dropdown-heading">Apply a label</span>
                         {userLabels(settings.labels).map((label) => (
                           <button

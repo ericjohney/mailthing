@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { encodeFile, fileSize, messageDate } from './api';
 import { EmailContent } from './mailbox/EmailContent';
-import { placeLabels } from './mailbox/navigation';
+import { categories, placeLabels } from './mailbox/navigation';
 import {
   emptyDraft,
   type Conversation as ConversationData,
@@ -130,6 +130,18 @@ export function Conversation({
           </IconButton>
           {labelMenu && (
             <div className="dropdown">
+              <span className="dropdown-heading">Move to category</span>
+              {categories.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    action('category', item.id);
+                    setLabelMenu(false);
+                  }}
+                >
+                  {item.name}
+                </button>
+              ))}
               <span className="dropdown-heading">Conversation labels</span>
               {labels.length === 0 && (
                 <span className="dropdown-heading">Create labels in Settings</span>

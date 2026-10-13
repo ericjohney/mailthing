@@ -4,7 +4,7 @@ use crate::{
         Account, AttachmentView, Draft, Envelope, ImportState, Label, MessageView, Rule,
         ThreadSummary,
     },
-    outgoing, push, search,
+    outgoing, push, search, sorting,
 };
 use axum::{
     Json, Router,
@@ -61,6 +61,11 @@ pub fn router(state: AppState) -> Router {
         .route("/actions", post(actions))
         .route("/labels", get(labels).post(create_label))
         .route("/labels/{id}", axum::routing::delete(delete_label))
+        .route("/sorting/memories", get(sorting_memories))
+        .route(
+            "/sorting/memories/{id}",
+            axum::routing::put(save_sorting_memory),
+        )
         .route("/rules", get(rules).post(save_rule))
         .route("/rules/{id}", axum::routing::delete(delete_rule))
         .route("/drafts", get(drafts).post(save_draft))
@@ -206,7 +211,7 @@ async fn settings(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     let account = db::account(&state.pool).await?;
     let labels = all_labels(&state).await?;
     Ok(Json(
-        json!({"account":account,"labels":labels,"counts":db::counts(&state.pool).await?,"outbound_configured":!state.config.relay_host.is_empty(),"smtp_port":state.config.smtp_port,"max_message_bytes":state.config.max_message_bytes}),
+        json!({"account":account,"labels":labels,"counts":db::counts(&state.pool).await?,"outbound_configured":!state.config.relay_host.is_empty(),"sorting_configured":state.sorter.is_some(),"sorting_model":state.config.llm.as_ref().map(|c| &c.model),"smtp_port":state.config.smtp_port,"max_message_bytes":state.config.max_message_bytes}),
     ))
 }
 async fn save_account(
@@ -370,6 +375,18 @@ async fn actions(
                 } else {
                     labels::remove(&mut tx, id, &[&action.value]).await?;
                 }
+                sorting::remember(&mut tx, id, &action.value, action.action == "label").await?;
+                continue;
+            }
+            "category" => {
+                if !labels::CATEGORIES.contains(&action.value.as_str()) {
+                    return Err(ApiError::bad("Choose a valid category"));
+                }
+                for category in labels::CATEGORIES {
+                    sorting::remember(&mut tx, id, category, category == action.value).await?;
+                }
+                labels::remove(&mut tx, id, &labels::CATEGORIES).await?;
+                labels::add(&mut tx, id, &action.value).await?;
                 continue;
             }
             "delete" => {
@@ -487,6 +504,45 @@ async fn delete_label(
         .await?;
     Ok(Json(json!({"ok":true})))
 }
+async fn sorting_memories(State(state): State<AppState>) -> ApiResult<Json<Vec<sorting::Memory>>> {
+    Ok(Json(sorting::memories(&state.pool).await?))
+}
+#[derive(Deserialize)]
+struct MemoryInput {
+    guidance: String,
+    #[serde(default)]
+    clear_examples: bool,
+}
+async fn save_sorting_memory(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(input): Json<MemoryInput>,
+) -> ApiResult<Json<Value>> {
+    if input.guidance.chars().count() > 2000 {
+        return Err(ApiError::bad(
+            "Sorting guidance must be at most 2000 characters",
+        ));
+    }
+    let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+    let kind: Option<String> = sqlx::query_scalar("SELECT kind FROM labels WHERE id=?")
+        .bind(&id)
+        .fetch_optional(&mut *tx)
+        .await?;
+    if kind.as_deref() != Some("user") && !labels::CATEGORIES.contains(&id.as_str()) {
+        return Err(ApiError::bad("Choose a user label or inbox category"));
+    }
+    sqlx::query("INSERT INTO sorting_memory(label_id,guidance) VALUES(?,?) ON CONFLICT(label_id) DO UPDATE SET guidance=excluded.guidance")
+        .bind(&id).bind(input.guidance.trim()).execute(&mut *tx).await?;
+    if input.clear_examples {
+        sqlx::query("DELETE FROM sorting_examples WHERE label_id=?")
+            .bind(&id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(Json(json!({"ok":true})))
+}
+
 async fn rules(State(state): State<AppState>) -> ApiResult<Json<Vec<Rule>>> {
     Ok(Json(
         sqlx::query_as("SELECT * FROM rules ORDER BY rowid")
@@ -757,8 +813,12 @@ async fn pipeline_status(State(state): State<AppState>) -> ApiResult<Json<Value>
     let avg:Option<f64>=sqlx::query_scalar("SELECT AVG(duration_ms) FROM (SELECT duration_ms FROM jobs WHERE status='completed' ORDER BY completed_at DESC LIMIT 100)").fetch_one(&state.pool).await?;
     let failures=sqlx::query("SELECT id,error,received_at,kind FROM jobs WHERE status='failed' ORDER BY received_at DESC LIMIT 20").fetch_all(&state.pool).await?;
     let failures:Vec<Value>=failures.into_iter().map(|row|json!({"id":row.get::<String,_>("id"),"error":row.get::<String,_>("error"),"received_at":row.get::<i64,_>("received_at"),"kind":row.get::<String,_>("kind")})).collect();
+    let mut stages = state.pipeline.names();
+    if state.sorter.is_some() {
+        stages.insert(stages.len().saturating_sub(1), "LLM sorting");
+    }
     Ok(Json(
-        json!({"counts":counts,"average_ms":avg.unwrap_or(0.0),"stages":state.pipeline.names(),"concurrency":state.config.concurrency,"failures":failures}),
+        json!({"counts":counts,"average_ms":avg.unwrap_or(0.0),"stages":stages,"concurrency":state.config.concurrency,"failures":failures}),
     ))
 }
 async fn retry_job(

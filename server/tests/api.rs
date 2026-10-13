@@ -541,3 +541,138 @@ async fn imports_keep_original_time_mailbox_state_and_labels() {
         );
     }
 }
+
+#[tokio::test]
+async fn sorting_memory_tracks_only_explicit_corrections_and_can_be_cleared() {
+    let (_temp, state) = setup().await;
+    let mut thread_ids = Vec::new();
+    for i in 0..14 {
+        thread_ids.push(
+            deliver(
+                &state,
+                mail(
+                    &format!("Topic {i}"),
+                    &format!("memory-{i}"),
+                    "Keep this example",
+                ),
+            )
+            .await,
+        );
+    }
+    let app = api::router(state.clone());
+    let (_, label) = request(
+        &app,
+        "POST",
+        "/api/labels",
+        json!({"name":"Work","color":"#123456"}),
+    )
+    .await;
+    let id = label["id"].as_str().unwrap();
+    let path = format!("/api/sorting/memories/{id}");
+    assert_eq!(
+        request(
+            &app,
+            "PUT",
+            &path,
+            json!({"guidance":"Work correspondence"})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        request(
+            &app,
+            "PUT",
+            "/api/sorting/memories/TRASH",
+            json!({"guidance":"Delete all"})
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        request(&app, "PUT", &path, json!({"guidance":"x".repeat(2001)}))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        request(
+            &app,
+            "POST",
+            "/api/actions",
+            json!({"thread_ids":thread_ids,"action":"label","value":id})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let (_, memories) = request(&app, "GET", "/api/sorting/memories", json!(null)).await;
+    let memory = memories
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["label_id"] == id)
+        .unwrap();
+    assert_eq!(memory["example_count"], 12);
+    assert_eq!(memory["examples"].as_array().unwrap().len(), 4);
+    assert!(
+        memory["examples"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|e| e["included"] == true)
+    );
+    request(
+        &app,
+        "POST",
+        "/api/actions",
+        json!({"thread_ids":[thread_ids[13]],"action":"unlabel","value":id}),
+    )
+    .await;
+    let (_, memories) = request(&app, "GET", "/api/sorting/memories", json!(null)).await;
+    let memory = memories
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["label_id"] == id)
+        .unwrap();
+    assert_eq!(memory["examples"][0]["included"], false);
+    request(
+        &app,
+        "POST",
+        "/api/actions",
+        json!({"thread_ids":[thread_ids[13]],"action":"category","value":"CATEGORY_SOCIAL"}),
+    )
+    .await;
+    let (_, memories) = request(&app, "GET", "/api/sorting/memories", json!(null)).await;
+    for category in mailthing::labels::CATEGORIES {
+        let memory = memories
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["label_id"] == category)
+            .unwrap();
+        assert_eq!(
+            memory["examples"][0]["included"],
+            category == "CATEGORY_SOCIAL"
+        );
+    }
+    request(
+        &app,
+        "PUT",
+        &path,
+        json!({"guidance":"Work correspondence","clear_examples":true}),
+    )
+    .await;
+    let (_, memories) = request(&app, "GET", "/api/sorting/memories", json!(null)).await;
+    let memory = memories
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["label_id"] == id)
+        .unwrap();
+    assert_eq!(memory["example_count"], 0);
+    assert_eq!(memory["guidance"], "Work correspondence");
+}
