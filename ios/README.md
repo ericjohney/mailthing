@@ -25,7 +25,10 @@ The app never presents invented messages as mailbox data.
 The app shares Mailthing's folded-m logo and charcoal palette with the web app.
 Inbox navigation, category selection, search, and compose live in one compact
 header. Search appears on demand; folders, categories, and labels are available
-through the logo button. Message rows use unread dots and fine separators.
+through the logo or mailbox title. Tapping either slides the message list right
+to reveal the mailbox panel. Select a mailbox or category to slide it back; tap
+the exposed message-list strip or swipe left to close. Swiping right from the
+left edge also opens the panel. Message rows use unread dots and fine separators.
 Swipe or long-press a conversation to mark it read/unread or star it.
 
 The reader keeps back navigation, sender details, archive, reply, and more actions

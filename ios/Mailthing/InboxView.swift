@@ -2,9 +2,10 @@ import SwiftUI
 
 struct InboxView: View {
     @EnvironmentObject private var store: MailStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sidebar = false
+    @GestureState private var drawerDrag: CGFloat = 0
     @State private var showSettings = false
-    @State private var settingsAfterSidebar = false
     @State private var compose: Draft?
     @State private var showSearch = false
     @FocusState private var searching: Bool
@@ -14,25 +15,46 @@ struct InboxView: View {
 
     var body: some View {
         NavigationStack(path: $store.path) {
-            VStack(spacing: 0) {
-                header
-                if showSearch || !store.search.isEmpty { searchBar }
-                if let error = store.error { connectionError(error) }
-                if store.label == "DRAFTS" && store.search.isEmpty {
-                    draftList
-                } else {
-                    threadList
+            GeometryReader { geometry in
+                let panelWidth = min(geometry.size.width - 56, 340)
+                let offset = min(panelWidth, max(0, (sidebar ? panelWidth : 0) + drawerDrag))
+                ZStack(alignment: .leading) {
+                    sidebarView
+                        .frame(width: panelWidth, height: geometry.size.height)
+                        .disabled(drawerDrag != 0)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityHidden(!sidebar)
+                        .allowsHitTesting(sidebar)
+                    inboxContent
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityHidden(sidebar)
+                        .allowsHitTesting(!sidebar)
+                        .overlay {
+                            if sidebar {
+                                Button { setSidebar(false) } label: {
+                                    Color.black.opacity(0.08).contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Close mailbox menu")
+                            }
+                        }
+                        .shadow(color: .black.opacity(offset > 0 ? 0.16 : 0), radius: 18, x: -5)
+                        .offset(x: offset)
+                    if !sidebar {
+                        Color.clear
+                            .frame(width: 20)
+                            .contentShape(Rectangle())
+                            .gesture(drawerGesture(panelWidth: panelWidth))
+                            .accessibilityHidden(true)
+                    }
                 }
+                .background(Color.mailSurface)
+                .clipped()
+                .simultaneousGesture(sidebar ? drawerGesture(panelWidth: panelWidth) : nil)
+                .accessibilityAction(.escape) { setSidebar(false) }
             }
-            .background(Color(uiColor: .systemBackground))
-            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { ConversationView(id: $0) }
-            .sheet(isPresented: $sidebar, onDismiss: {
-                if settingsAfterSidebar {
-                    settingsAfterSidebar = false
-                    showSettings = true
-                }
-            }) { sidebarView.presentationDetents([.large]) }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(item: $compose, onDismiss: { Task { await store.refresh() } }) { ComposeView(initial: $0) }
             .task(id: "\(store.label)|\(store.category)|\(store.search)") {
@@ -44,23 +66,51 @@ struct InboxView: View {
             }
         }
         .tint(.mailAction)
+        .onChange(of: store.path) { _, path in
+            if !path.isEmpty { setSidebar(false) }
+        }
+    }
+
+    private var inboxContent: some View {
+        VStack(spacing: 0) {
+            header
+            if showSearch || !store.search.isEmpty { searchBar }
+            if let error = store.error { connectionError(error) }
+            if store.label == "DRAFTS" && store.search.isEmpty {
+                draftList
+            } else {
+                threadList
+            }
+        }
+        .background(Color(uiColor: .systemBackground))
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
+    private func setSidebar(_ open: Bool) {
+        searching = false
+        withAnimation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.9)) {
+            sidebar = open
+        }
+    }
+    private func drawerGesture(panelWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 12)
+            .updating($drawerDrag) { value, state, _ in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                state = value.translation.width
+            }
+            .onEnded { value in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                let destination = (sidebar ? panelWidth : 0) + value.predictedEndTranslation.width
+                setSidebar(destination > panelWidth / 2)
+            }
     }
 
     private var header: some View {
         MailHeader {
-            Button { searching = false; sidebar = true } label: {
+            Button { setSidebar(true) } label: {
                 MailMark().frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel("Open mailboxes")
-            Menu {
-                Button("Mailboxes", systemImage: "tray.full") { sidebar = true }
-                if store.label == "INBOX" {
-                    Picker("Inbox category", selection: $store.category) {
-                        Text("All categories").tag("")
-                        ForEach(categories, id: \.0) { id, name, _ in Text(name).tag(id) }
-                    }
-                }
-                Button("Settings", systemImage: "gearshape") { showSettings = true }
-            } label: {
+            Button { setSidebar(true) } label: {
                 HStack(spacing: 6) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(store.title).font(.headline).lineLimit(1)
@@ -69,7 +119,6 @@ struct InboxView: View {
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
-                    Image(systemName: "chevron.down").font(.caption2).foregroundStyle(.secondary)
                     if let unread = store.settings?.counts[store.label]?.unread, unread > 0 {
                         Text("\(unread)").font(.caption).foregroundStyle(.secondary)
                             .accessibilityLabel("\(unread) unread messages")
@@ -77,7 +126,8 @@ struct InboxView: View {
                 }
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
-            }.foregroundStyle(.primary)
+            }.buttonStyle(.plain).foregroundStyle(.primary)
+                .accessibilityLabel("Choose mailbox, \(store.title)")
             Spacer(minLength: 0)
             if store.loading { ProgressView().controlSize(.mini).accessibilityLabel("Refreshing mailbox") }
             MailIconButton(symbol: "magnifyingglass", label: "Search mail") {
@@ -198,50 +248,47 @@ struct InboxView: View {
     }
 
     private var sidebarView: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                MailHeader {
-                    MailIconButton(symbol: "xmark", label: "Close mailboxes") { sidebar = false }
-                    Text("Mailboxes").font(.headline)
-                    Spacer()
-                    MailIconButton(symbol: "gearshape", label: "Settings") {
-                        settingsAfterSidebar = true
-                        sidebar = false
-                    }
+        VStack(spacing: 0) {
+            MailHeader {
+                MailMark().frame(width: 44, height: 44)
+                Text("Mailthing").font(.headline)
+                Spacer()
+                MailIconButton(symbol: "gearshape", label: "Settings") {
+                    setSidebar(false)
+                    showSettings = true
                 }
-                List {
-                    MailAccountCard(account: store.settings?.account)
-                        .listRowSeparator(.hidden)
-                    ForEach(mailboxes, id: \.0) { id, title, icon in
-                        Button { selectMailbox(id) } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: icon).frame(width: 20).foregroundStyle(.secondary)
-                                Text(title).fontWeight(store.label == id ? .semibold : .regular)
-                                Spacer()
-                                if let count = store.settings?.counts[id], count.unread > 0 {
-                                    Text("\(count.unread)").font(.caption).foregroundStyle(.secondary)
-                                }
-                            }.padding(.vertical, 3)
-                        }.foregroundStyle(.primary)
-                            .listRowBackground(store.label == id ? Color.mailTint : Color(uiColor: .systemBackground))
-                    }
-                    Section("Inbox categories") {
-                        categoryRow(id: "", name: "All categories", icon: "tray.full")
-                        ForEach(categories, id: \.0) { id, name, icon in categoryRow(id: id, name: name, icon: icon) }
-                    }
-                    if let labels = store.settings?.labels.filter({ $0.kind == "user" }), !labels.isEmpty {
-                        Section("Labels") {
-                            ForEach(labels) { label in
-                                Button { selectMailbox(label.id) } label: { Label(label.name, systemImage: "tag") }
-                                    .foregroundStyle(.primary)
-                                    .listRowBackground(store.label == label.id ? Color.mailTint : Color(uiColor: .systemBackground))
+            }
+            List {
+                ForEach(mailboxes, id: \.0) { id, title, icon in
+                    Button { selectMailbox(id) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: icon).frame(width: 20).foregroundStyle(.secondary)
+                            Text(title).fontWeight(store.label == id ? .semibold : .regular)
+                            Spacer()
+                            if let count = store.settings?.counts[id], count.unread > 0 {
+                                Text("\(count.unread)").font(.caption).foregroundStyle(.secondary)
                             }
+                        }.padding(.vertical, 3)
+                    }.foregroundStyle(.primary)
+                        .listRowBackground(store.label == id ? Color.mailTint : Color(uiColor: .systemBackground))
+                }
+                Section("Inbox categories") {
+                    categoryRow(id: "", name: "All categories", icon: "tray.full")
+                    ForEach(categories, id: \.0) { id, name, icon in categoryRow(id: id, name: name, icon: icon) }
+                }
+                if let labels = store.settings?.labels.filter({ $0.kind == "user" }), !labels.isEmpty {
+                    Section("Labels") {
+                        ForEach(labels) { label in
+                            Button { selectMailbox(label.id) } label: { Label(label.name, systemImage: "tag") }
+                                .foregroundStyle(.primary)
+                                .listRowBackground(store.label == label.id ? Color.mailTint : Color(uiColor: .systemBackground))
                         }
                     }
                 }
-                .listStyle(.plain).contentMargins(.top, 0, for: .scrollContent)
-            }.toolbar(.hidden, for: .navigationBar)
-        }.tint(.mailAction)
+            }
+            .listStyle(.plain).contentMargins(.top, 0, for: .scrollContent)
+        }
+        .background(Color(uiColor: .systemBackground))
     }
 
     private func categoryRow(id: String, name: String, icon: String) -> some View {
@@ -261,7 +308,7 @@ struct InboxView: View {
         store.select(id)
         showSearch = false
         searching = false
-        sidebar = false
+        setSidebar(false)
     }
 
     private func deleteDraft(_ draft: Draft) async {
