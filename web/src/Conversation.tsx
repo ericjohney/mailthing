@@ -52,6 +52,7 @@ export function Conversation({
   const [labelMenu, setLabelMenu] = useState(false);
   const latest = data.messages[data.messages.length - 1];
   const trashed = latest.labels.includes('TRASH');
+  const spam = data.messages.some((message) => message.labels.includes('SPAM'));
   const important = data.messages.some((message) => message.labels.includes('IMPORTANT'));
   const applied = data.labels.filter((label) => label.kind === 'user');
   const places = placeLabels.flatMap((id) => data.labels.find((label) => label.id === id) ?? []);
@@ -111,7 +112,10 @@ export function Conversation({
         >
           <Trash2 size={18} />
         </IconButton>
-        <IconButton label="Report spam" onClick={() => action('spam')}>
+        <IconButton
+          label={spam ? 'Not spam' : 'Report spam'}
+          onClick={() => action(spam ? 'not_spam' : 'spam')}
+        >
           <ShieldAlert size={18} />
         </IconButton>
         <span className="toolbar-divider" />

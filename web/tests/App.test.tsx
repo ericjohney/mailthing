@@ -189,3 +189,28 @@ describe('personal mailbox', () => {
     expect(document.documentElement.dataset.theme).toBe('dark');
   });
 });
+
+it('offers Not spam for selected conversations in the Spam view', async () => {
+  const user = userEvent.setup();
+  mailbox = [{ ...thread, label_ids: ['SPAM', 'UNREAD', 'CATEGORY_PERSONAL'] }];
+  render(
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>,
+  );
+  await screen.findByText('Weekend plans');
+  await user.click(screen.getByRole('button', { name: 'More' }));
+  await user.click(screen.getByRole('button', { name: 'Spam' }));
+  await user.click(screen.getByRole('checkbox', { name: 'Select Weekend plans' }));
+  await user.click(screen.getByRole('button', { name: 'Mark selected as not spam' }));
+  await waitFor(() =>
+    expect(
+      calls.some(
+        (call) =>
+          call.path === '/api/actions' &&
+          call.body?.action === 'not_spam' &&
+          call.body.thread_ids[0] === 'thread-1',
+      ),
+    ).toBe(true),
+  );
+});

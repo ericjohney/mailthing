@@ -16,6 +16,7 @@ export interface Settings {
   outbound_configured: boolean;
   sorting_configured?: boolean;
   sorting_model?: string | null;
+  spam_threshold?: number | null;
   smtp_port: number;
   max_message_bytes: number;
 }

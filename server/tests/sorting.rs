@@ -31,13 +31,14 @@ async fn mock(response: Value) -> (Sorter, Arc<Mutex<Vec<Value>>>, tokio::task::
             api_key: "test-secret".into(),
             model: "custom-luna-alias".into(),
             timeout_seconds: 1,
+            spam_threshold: 0.95,
         }),
         requests,
         task,
     )
 }
 fn completion(category: &str, labels: Value) -> Value {
-    json!({"choices":[{"finish_reason":"stop","message":{"content":json!({"category":category,"label_ids":labels}).to_string()}}]})
+    json!({"choices":[{"finish_reason":"stop","message":{"content":json!({"category":category,"label_ids":labels,"spam":{"is_spam":false,"confidence":0.99}}).to_string()}}]})
 }
 
 #[tokio::test]
@@ -60,6 +61,10 @@ async fn sorter_uses_owner_memory_and_bounds_email_content() {
     let request = requests.lock().unwrap()[0].clone();
     assert_eq!(request["model"], "custom-luna-alias");
     assert_eq!(request["stream"], true);
+    let label_schema =
+        &request["response_format"]["json_schema"]["schema"]["properties"]["label_ids"];
+    assert_eq!(label_schema["items"]["enum"], json!(["finance"]));
+    assert_eq!(label_schema["maxItems"], 1);
     let input: Value =
         serde_json::from_str(request["messages"][1]["content"].as_str().unwrap()).unwrap();
     assert_eq!(
@@ -160,7 +165,7 @@ async fn invalid_results_and_provider_errors_keep_mail_deliverable() {
 
 #[test]
 fn streaming_parser_requires_a_complete_valid_response() {
-    let content = json!({"category":"CATEGORY_PERSONAL","label_ids":[]}).to_string();
+    let content = json!({"category":"CATEGORY_PERSONAL","label_ids":[],"spam":{"is_spam":false,"confidence":0.99}}).to_string();
     let sse = format!(
         "data: {}\r\n\r\ndata: {}\n\ndata: [DONE]\n\n",
         json!({"choices":[{"delta":{"content":content}}]}),
@@ -203,6 +208,7 @@ async fn provider_timeout_falls_back_and_spam_skips_the_provider() {
         api_key: "secret".into(),
         model: "luna".into(),
         timeout_seconds: 1,
+        spam_threshold: 0.95,
     });
     let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
     let id = db::enqueue(&state.pool, mail("Hello", "timeout", "Hi"), &envelope())
@@ -239,5 +245,134 @@ async fn provider_timeout_falls_back_and_spam_skips_the_provider() {
         .await
         .unwrap();
     assert_eq!(requests.load(std::sync::atomic::Ordering::SeqCst), 1);
+    task.abort();
+}
+
+fn spam_completion(is_spam: bool, confidence: f64) -> Value {
+    json!({"choices":[{"finish_reason":"stop","message":{"content":json!({"category":"CATEGORY_UPDATES","label_ids":[],"spam":{"is_spam":is_spam,"confidence":confidence}}).to_string()}}]})
+}
+
+#[tokio::test]
+async fn spam_threshold_is_conservative_and_does_not_teach_itself_or_alert() {
+    for (is_spam, confidence, moved) in [
+        (true, 0.949, false),
+        (true, 0.95, true),
+        (true, 1.0, true),
+        (false, 1.0, false),
+    ] {
+        let (_temp, state) = setup().await;
+        sqlx::query("INSERT INTO push_devices(token,environment,registered_at) VALUES('test-device','sandbox',1)").execute(&state.pool).await.unwrap();
+        let (sorter, requests, task) = mock(spam_completion(is_spam, confidence)).await;
+        let id = db::enqueue(
+            &state.pool,
+            mail("A notice", "spam-verdict", "Message body"),
+            &envelope(),
+        )
+        .await
+        .unwrap();
+        pipeline::process_next_with_sorter(&state.pool, state.pipeline.clone(), Some(&sorter))
+            .await
+            .unwrap();
+        let labels: Vec<String> =
+            sqlx::query_scalar("SELECT label_id FROM message_labels WHERE message_id=?")
+                .bind(&id)
+                .fetch_all(&state.pool)
+                .await
+                .unwrap();
+        assert_eq!(labels.iter().any(|l| l == "SPAM"), moved);
+        assert_eq!(labels.iter().any(|l| l == "INBOX"), !moved);
+        assert!(!labels.iter().any(|l| l == "TRASH"));
+        let audit: (bool, f64, bool) = sqlx::query_as(
+            "SELECT spam,spam_confidence,spam_moved FROM sorting_results WHERE message_id=?",
+        )
+        .bind(&id)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+        assert_eq!(audit, (is_spam, confidence, moved));
+        let learned: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM sorting_examples WHERE label_id='SPAM'")
+                .fetch_one(&state.pool)
+                .await
+                .unwrap();
+        assert_eq!(learned, 0);
+        let pushes: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM push_deliveries WHERE message_id=?")
+                .bind(&id)
+                .fetch_one(&state.pool)
+                .await
+                .unwrap();
+        assert_eq!(pushes, if moved { 0 } else { 1 });
+        let payload = requests.lock().unwrap()[0].clone();
+        let input: Value =
+            serde_json::from_str(payload["messages"][1]["content"].as_str().unwrap()).unwrap();
+        assert_eq!(input["spam_memory"]["label_id"], "SPAM");
+        assert!(
+            !input["memories"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|m| m["label_id"] == "SPAM")
+        );
+        task.abort();
+    }
+}
+
+#[tokio::test]
+async fn malformed_spam_verdicts_cannot_partially_change_mail() {
+    for response in [
+        spam_completion(true, 1.01),
+        spam_completion(true, -0.01),
+        json!({"choices":[{"finish_reason":"stop","message":{"content":"{\"category\":\"CATEGORY_UPDATES\",\"label_ids\":[]}"}}]}),
+    ] {
+        let (_temp, state) = setup().await;
+        let (sorter, _, task) = mock(response).await;
+        let id = db::enqueue(
+            &state.pool,
+            mail("Hello", "invalid-spam", "Hi"),
+            &envelope(),
+        )
+        .await
+        .unwrap();
+        pipeline::process_next_with_sorter(&state.pool, state.pipeline.clone(), Some(&sorter))
+            .await
+            .unwrap();
+        let labels: Vec<String> =
+            sqlx::query_scalar("SELECT label_id FROM message_labels WHERE message_id=?")
+                .bind(&id)
+                .fetch_all(&state.pool)
+                .await
+                .unwrap();
+        assert!(labels.iter().any(|l| l == "INBOX"));
+        assert!(labels.iter().any(|l| l == "CATEGORY_PERSONAL"));
+        assert!(!labels.iter().any(|l| l == "SPAM"));
+        task.abort();
+    }
+}
+
+#[tokio::test]
+async fn explicit_allow_rule_overrides_spam_without_training_memory() {
+    let (_temp, state) = setup().await;
+    sqlx::query("INSERT INTO rules(id,name,field,contains,action,value) VALUES('allow','Trusted sender','from','sam@example.net','not_spam','')").execute(&state.pool).await.unwrap();
+    let (sorter, _, task) = mock(spam_completion(true, 1.0)).await;
+    let id = db::enqueue(&state.pool, mail("Hello", "allow-spam", "Hi"), &envelope())
+        .await
+        .unwrap();
+    pipeline::process_next_with_sorter(&state.pool, state.pipeline.clone(), Some(&sorter))
+        .await
+        .unwrap();
+    let labels: Vec<String> =
+        sqlx::query_scalar("SELECT label_id FROM message_labels WHERE message_id=?")
+            .bind(&id)
+            .fetch_all(&state.pool)
+            .await
+            .unwrap();
+    assert!(labels.iter().any(|l| l == "INBOX"));
+    assert!(!labels.iter().any(|l| l == "SPAM"));
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sorting_examples")
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
     task.abort();
 }

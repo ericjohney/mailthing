@@ -211,7 +211,7 @@ async fn settings(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     let account = db::account(&state.pool).await?;
     let labels = all_labels(&state).await?;
     Ok(Json(
-        json!({"account":account,"labels":labels,"counts":db::counts(&state.pool).await?,"outbound_configured":!state.config.relay_host.is_empty(),"sorting_configured":state.sorter.is_some(),"sorting_model":state.config.llm.as_ref().map(|c| &c.model),"smtp_port":state.config.smtp_port,"max_message_bytes":state.config.max_message_bytes}),
+        json!({"account":account,"labels":labels,"counts":db::counts(&state.pool).await?,"outbound_configured":!state.config.relay_host.is_empty(),"sorting_configured":state.sorter.is_some(),"sorting_model":state.config.llm.as_ref().map(|c| &c.model),"spam_threshold":state.config.llm.as_ref().map(|c| c.spam_threshold),"smtp_port":state.config.smtp_port,"max_message_bytes":state.config.max_message_bytes}),
     ))
 }
 async fn save_account(
@@ -410,8 +410,22 @@ async fn actions(
             }
             "archive" => (None, &[INBOX, SNOOZED]),
             "trash" => (Some(TRASH), &[INBOX, SPAM, SNOOZED]),
-            "spam" => (Some(SPAM), &[INBOX, TRASH, SNOOZED]),
-            "inbox" => (Some(INBOX), &[SPAM, TRASH, SNOOZED]),
+            "spam" => {
+                sorting::remember(&mut tx, id, SPAM, true).await?;
+                (Some(SPAM), &[INBOX, TRASH, SNOOZED])
+            }
+            "not_spam" => {
+                sorting::remember(&mut tx, id, SPAM, false).await?;
+                (Some(INBOX), &[SPAM, TRASH, SNOOZED])
+            }
+            "inbox" => {
+                let was_spam: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM messages m JOIN message_labels ml ON ml.message_id=m.id WHERE m.thread_id=? AND ml.label_id='SPAM')")
+                    .bind(id).fetch_one(&mut *tx).await?;
+                if was_spam {
+                    sorting::remember(&mut tx, id, SPAM, false).await?;
+                }
+                (Some(INBOX), &[SPAM, TRASH, SNOOZED])
+            }
             "read" => (None, &[UNREAD]),
             "unread" => (Some(UNREAD), &[]),
             "star" => (Some(STARRED), &[]),
@@ -528,8 +542,11 @@ async fn save_sorting_memory(
         .bind(&id)
         .fetch_optional(&mut *tx)
         .await?;
-    if kind.as_deref() != Some("user") && !labels::CATEGORIES.contains(&id.as_str()) {
-        return Err(ApiError::bad("Choose a user label or inbox category"));
+    if kind.as_deref() != Some("user")
+        && !labels::CATEGORIES.contains(&id.as_str())
+        && id != labels::SPAM
+    {
+        return Err(ApiError::bad("Choose a user label, inbox category or Spam"));
     }
     sqlx::query("INSERT INTO sorting_memory(label_id,guidance) VALUES(?,?) ON CONFLICT(label_id) DO UPDATE SET guidance=excluded.guidance")
         .bind(&id).bind(input.guidance.trim()).execute(&mut *tx).await?;
@@ -564,6 +581,7 @@ async fn save_rule(
             "category",
             "archive",
             "spam",
+            "not_spam",
             "star",
             "important",
             "read",

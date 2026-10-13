@@ -238,7 +238,7 @@ export function Settings({
           <>
             <SectionHeading
               title="Teach your mail sorter"
-              description="Describe what belongs in each category or label. Applying or removing labels teaches future sorting; your filters still take precedence."
+              description="Describe what belongs in each category or label. Applying or removing labels teaches future sorting. Spam and Not spam corrections teach spam detection; your filters still take precedence."
             />
             <p className="muted">
               {settings.sorting_configured
@@ -247,6 +247,14 @@ export function Settings({
               New labels are sorted automatically once you add guidance or apply them to a
               conversation.
             </p>
+            {settings.sorting_configured && (
+              <p className="muted small">
+                Mail moves automatically to Spam only at{' '}
+                {Math.round((settings.spam_threshold ?? 0.95) * 100)}% model confidence or higher.
+                Uncertain mail stays in the inbox. Promotions and newsletters are treated as
+                legitimate mail unless your guidance says otherwise.
+              </p>
+            )}
             {memories.map((memory) => (
               <form
                 key={memory.label_id}
@@ -310,8 +318,14 @@ export function Settings({
                     <summary>Recent examples</summary>
                     {memory.examples.map((example, index) => (
                       <p className="muted small" key={index}>
-                        {example.included ? 'Belongs here' : 'Doesn’t belong here'} ·{' '}
-                        {example.sender} · {example.subject}
+                        {memory.label_id === 'SPAM'
+                          ? example.included
+                            ? 'Spam'
+                            : 'Not spam'
+                          : example.included
+                            ? 'Belongs here'
+                            : 'Doesn’t belong here'}{' '}
+                        · {example.sender} · {example.subject}
                       </p>
                     ))}
                   </details>
@@ -383,6 +397,7 @@ export function Settings({
                       ['important', 'Mark important'],
                       ['read', 'Mark as read'],
                       ['spam', 'Move to spam'],
+                      ['not_spam', 'Never mark as spam'],
                     ].map(([value, label]) => (
                       <option key={value} value={value}>
                         {label}

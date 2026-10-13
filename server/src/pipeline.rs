@@ -340,6 +340,10 @@ impl Stage for RulesStage {
                     mail.remove_label(labels::INBOX);
                     mail.add_label(labels::SPAM);
                 }
+                "not_spam" => {
+                    mail.remove_label(labels::SPAM);
+                    mail.add_label(labels::INBOX);
+                }
                 "star" => mail.add_label(labels::STARRED),
                 "important" => mail.add_label(labels::IMPORTANT),
                 "read" => mail.remove_label(labels::UNREAD),
@@ -414,9 +418,10 @@ pub async fn persist(
             .bind(id).bind(label).execute(&mut *tx).await?;
     }
     if let Some(result) = &mail.sorting {
-        sqlx::query("INSERT OR REPLACE INTO sorting_results(message_id,model,category,label_ids,classified_at) VALUES(?,?,?,?,?)")
+        sqlx::query("INSERT OR REPLACE INTO sorting_results(message_id,model,category,label_ids,classified_at,spam,spam_confidence,spam_moved) VALUES(?,?,?,?,?,?,?,?)")
             .bind(id).bind(&result.model).bind(&result.decision.category)
             .bind(serde_json::to_string(&result.decision.label_ids)?).bind(db::now())
+            .bind(result.decision.spam.is_spam).bind(result.decision.spam.confidence).bind(result.spam_moved)
             .execute(&mut *tx).await?;
     }
     sqlx::query("UPDATE jobs SET status='completed',completed_at=?,duration_ms=?,error=NULL,raw=X'' WHERE id=?")

@@ -249,13 +249,16 @@ export function App() {
       refresh();
       if (
         route.thread &&
-        ['archive', 'trash', 'spam', 'snooze', 'unread', 'inbox', 'delete'].includes(name)
+        ['archive', 'trash', 'spam', 'not_spam', 'snooze', 'unread', 'inbox', 'delete'].includes(
+          name,
+        )
       )
         navigate({ label: route.label });
       const descriptions: Record<string, string> = {
         archive: 'Conversation archived',
         trash: 'Moved to Trash',
         spam: 'Moved to Spam',
+        not_spam: 'Marked as not spam and moved to Inbox',
         read: 'Marked as read',
         unread: 'Marked as unread',
         label: 'Label applied',
@@ -617,8 +620,12 @@ export function App() {
                     <Archive size={18} />
                   </IconButton>
                   <IconButton
-                    label="Report selected as spam"
-                    onClick={() => doAction('spam')}
+                    label={
+                      route.label === 'SPAM'
+                        ? 'Mark selected as not spam'
+                        : 'Report selected as spam'
+                    }
+                    onClick={() => doAction(route.label === 'SPAM' ? 'not_spam' : 'spam')}
                     disabled={busy}
                   >
                     <ShieldAlert size={18} />

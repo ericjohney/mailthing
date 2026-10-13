@@ -676,3 +676,113 @@ async fn sorting_memory_tracks_only_explicit_corrections_and_can_be_cleared() {
     assert_eq!(memory["example_count"], 0);
     assert_eq!(memory["guidance"], "Work correspondence");
 }
+
+#[tokio::test]
+async fn spam_corrections_balance_memory_and_ordinary_inbox_moves_do_not_train() {
+    let (_temp, state) = setup().await;
+    let mut threads = Vec::new();
+    for i in 0..28 {
+        threads.push(
+            deliver(
+                &state,
+                mail(
+                    &format!("Spam example {i}"),
+                    &format!("spam-example-{i}"),
+                    "Example body",
+                ),
+            )
+            .await,
+        );
+    }
+    let app = api::router(state.clone());
+    request(
+        &app,
+        "POST",
+        "/api/actions",
+        json!({"thread_ids":[threads[0]],"action":"inbox"}),
+    )
+    .await;
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sorting_examples WHERE label_id='SPAM'")
+            .fetch_one(&state.pool)
+            .await
+            .unwrap();
+    assert_eq!(count, 0);
+    request(
+        &app,
+        "POST",
+        "/api/actions",
+        json!({"thread_ids":threads[..14],"action":"spam"}),
+    )
+    .await;
+    request(
+        &app,
+        "POST",
+        "/api/actions",
+        json!({"thread_ids":threads[14..],"action":"not_spam"}),
+    )
+    .await;
+    let (_, memories) = request(&app, "GET", "/api/sorting/memories", json!(null)).await;
+    let spam = memories
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["label_id"] == "SPAM")
+        .unwrap();
+    assert_eq!(spam["example_count"], 24);
+    assert_eq!(
+        spam["examples"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["included"] == true)
+            .count(),
+        2
+    );
+    assert_eq!(
+        spam["examples"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["included"] == false)
+            .count(),
+        2
+    );
+    request(
+        &app,
+        "POST",
+        "/api/actions",
+        json!({"thread_ids":[threads[13]],"action":"inbox"}),
+    )
+    .await;
+    let included:bool=sqlx::query_scalar("SELECT e.included FROM sorting_examples e JOIN messages m ON m.id=e.message_id WHERE e.label_id='SPAM' AND m.thread_id=?").bind(&threads[13]).fetch_one(&state.pool).await.unwrap();
+    assert!(!included);
+    let (_, conversation) = request(
+        &app,
+        "GET",
+        &format!("/api/threads/{}", threads[13]),
+        json!(null),
+    )
+    .await;
+    let labels = conversation["messages"][0]["labels"].as_array().unwrap();
+    assert!(labels.iter().any(|l| l == "INBOX"));
+    assert!(!labels.iter().any(|l| l == "SPAM"));
+    assert_eq!(
+        request(
+            &app,
+            "PUT",
+            "/api/sorting/memories/SPAM",
+            json!({"guidance":"Unwanted scams","clear_examples":true})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sorting_examples WHERE label_id='SPAM'")
+            .fetch_one(&state.pool)
+            .await
+            .unwrap();
+    assert_eq!(count, 0);
+    assert_eq!(request(&app,"POST","/api/rules",json!({"id":"","name":"Trusted","field":"from","contains":"sam@example.net","action":"not_spam","value":"","enabled":true})).await.0,StatusCode::OK);
+}
