@@ -73,7 +73,9 @@ Alerts include the sender, subject, and a short preview. Tapping opens the
 conversation. APNs alerts can arrive without Tailscale; loading mail still needs
 the private server connection. Foreground inbox refreshes every 20 seconds and
 supports pull-to-refresh. APNs is required for reliable alerts while closed;
-foreground refresh is not a substitute for push.
+foreground refresh is not a substitute for push. Returning to the app refreshes
+the current mailbox immediately and retries push token registration if a token
+is available, including when returning while viewing a conversation.
 
 Simulator payload injection can verify notification UI and navigation, but does
 not prove that Apple accepted a production push. Verify that separately on the

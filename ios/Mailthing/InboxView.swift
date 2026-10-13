@@ -8,7 +8,6 @@ extension Color {
 
 struct InboxView: View {
     @EnvironmentObject private var store: MailStore
-    @Environment(\.scenePhase) private var phase
     @State private var sidebar = false
     @State private var showSettings = false
     @State private var compose: Draft?
@@ -90,13 +89,6 @@ struct InboxView: View {
             .sheet(item: $compose, onDismiss: { Task { await store.refresh() } }) { ComposeView(initial: $0) }
             .task(id: "\(store.label)|\(store.category)|\(store.search)") {
                 do { if !store.search.isEmpty { try await Task.sleep(for: .milliseconds(350)) }; try Task.checkCancellation(); await store.refresh() } catch {}
-            }
-            .task(id: phase) {
-                guard phase == .active else { return }
-                await store.notificationStatus()
-                while !Task.isCancelled {
-                    do { try await Task.sleep(for: .seconds(20)); try Task.checkCancellation(); await store.refresh() } catch { break }
-                }
             }
         }.tint(.mailBlue)
     }

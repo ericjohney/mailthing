@@ -44,12 +44,29 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 struct MailthingApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var store = MailStore()
+    @Environment(\.scenePhase) private var phase
     @AppStorage("appearance") private var appearance = "system"
     var body: some Scene {
         WindowGroup {
             InboxView().environmentObject(store)
                 .preferredColorScheme(appearance == "system" ? nil : appearance == "dark" ? .dark : .light)
-                .task { delegate.attach(store); await store.notificationStatus() }
+                .task { delegate.attach(store) }
+                .task(id: phase) {
+                    guard phase == .active else { return }
+                    // Refresh on every return to the app, including from a conversation.
+                    await store.refresh()
+                    guard !Task.isCancelled else { return }
+                    await store.notificationStatus()
+                    // Retry a token registration that may have failed while offline.
+                    await store.registerPush()
+                    while !Task.isCancelled {
+                        do {
+                            try await Task.sleep(for: .seconds(20))
+                            try Task.checkCancellation()
+                            await store.refresh()
+                        } catch { break }
+                    }
+                }
                 .onOpenURL { url in
                     if url.scheme == "mailthing", url.host == "thread" { store.openNotification(url.lastPathComponent) }
                 }
