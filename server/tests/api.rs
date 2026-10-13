@@ -786,3 +786,29 @@ async fn spam_corrections_balance_memory_and_ordinary_inbox_moves_do_not_train()
     assert_eq!(count, 0);
     assert_eq!(request(&app,"POST","/api/rules",json!({"id":"","name":"Trusted","field":"from","contains":"sam@example.net","action":"not_spam","value":"","enabled":true})).await.0,StatusCode::OK);
 }
+
+#[tokio::test]
+async fn regenerates_legacy_previews_without_changing_saved_messages_or_mailbox_state() {
+    let (_temp, state) = setup().await;
+    let thread = deliver(&state, mail("Old preview", "old-preview", "Original body")).await;
+    sqlx::query("UPDATE messages SET snippet='Old broken preview', text='Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nDelivery =E2=9C=93 &amp; pickup' WHERE thread_id=?")
+        .bind(&thread).execute(&state.pool).await.unwrap();
+    let (status, body) = request(
+        &api::router(state.clone()),
+        "GET",
+        "/api/threads",
+        json!(null),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["threads"][0]["snippet"], "Delivery ✓ & pickup");
+    assert_eq!(body["threads"][0]["unread"], 1);
+    assert!(body["threads"][0].get("text").is_none());
+    assert!(body["threads"][0].get("html").is_none());
+    let stored: String = sqlx::query_scalar("SELECT snippet FROM messages WHERE thread_id=?")
+        .bind(&thread)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    assert_eq!(stored, "Old broken preview");
+}

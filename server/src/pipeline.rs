@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use mailparse::{MailHeaderMap, ParsedMail};
 use sha2::{Digest, Sha256};
 use sqlx::{Row, SqlitePool};
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Debug, Default)]
 pub struct ProcessedMail {
@@ -234,19 +234,9 @@ impl Stage for SanitizeStage {
         let mail = &mut context.mail;
         mail.html = crate::email_html::sanitize(&mail.html);
         if mail.text.trim().is_empty() {
-            mail.text = ammonia::Builder::default()
-                .tags(HashSet::new())
-                .clean(&mail.html)
-                .to_string();
+            mail.text = crate::preview::html_text(&mail.html);
         }
-        mail.snippet = mail
-            .text
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-            .chars()
-            .take(180)
-            .collect();
+        mail.snippet = crate::preview::snippet(&mail.text, &mail.html);
         Ok(())
     }
 }

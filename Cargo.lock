@@ -1165,6 +1165,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "dotenvy",
+ "html5ever",
  "http-body-util",
  "jsonwebtoken",
  "lettre",

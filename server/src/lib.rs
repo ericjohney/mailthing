@@ -6,6 +6,7 @@ pub mod labels;
 pub mod models;
 pub mod outgoing;
 pub mod pipeline;
+pub mod preview;
 pub mod push;
 pub mod search;
 pub mod smtp;

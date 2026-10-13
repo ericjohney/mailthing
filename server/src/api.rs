@@ -245,6 +245,8 @@ struct ThreadRow {
     #[sqlx(flatten)]
     thread: ThreadSummary,
     total: i64,
+    text: String,
+    html: String,
 }
 async fn threads(
     State(state): State<AppState>,
@@ -289,7 +291,7 @@ async fn threads(
     let mut sql =
         QueryBuilder::<Sqlite>::with_arguments(filter_sql.clone(), filter_arguments.clone());
     // The row shows the newest matching message; counts and labels cover the whole conversation.
-    sql.push("), ranked AS (SELECT m.*,ROW_NUMBER() OVER(PARTITION BY thread_id ORDER BY received_at DESC,id DESC) AS rank FROM filtered m) SELECT thread_id AS id,subject,sender,sender_email,snippet,received_at,(SELECT COUNT(*) FROM messages x WHERE x.thread_id=m.thread_id) AS count,(SELECT COUNT(*) FROM messages x JOIN message_labels u ON u.message_id=x.id AND u.label_id='UNREAD' WHERE x.thread_id=m.thread_id) AS unread,EXISTS(SELECT 1 FROM attachments a JOIN messages x ON x.id=a.message_id WHERE x.thread_id=m.thread_id) AS has_attachment,(SELECT json_group_array(DISTINCT ml.label_id) FROM message_labels ml JOIN messages x ON x.id=ml.message_id WHERE x.thread_id=m.thread_id) AS label_ids,COUNT(*) OVER() AS total FROM ranked m WHERE rank=1 ORDER BY received_at DESC LIMIT 50 OFFSET ")
+    sql.push("), ranked AS (SELECT m.*,ROW_NUMBER() OVER(PARTITION BY thread_id ORDER BY received_at DESC,id DESC) AS rank FROM filtered m) SELECT thread_id AS id,subject,sender,sender_email,snippet,text,html,received_at,(SELECT COUNT(*) FROM messages x WHERE x.thread_id=m.thread_id) AS count,(SELECT COUNT(*) FROM messages x JOIN message_labels u ON u.message_id=x.id AND u.label_id='UNREAD' WHERE x.thread_id=m.thread_id) AS unread,EXISTS(SELECT 1 FROM attachments a JOIN messages x ON x.id=a.message_id WHERE x.thread_id=m.thread_id) AS has_attachment,(SELECT json_group_array(DISTINCT ml.label_id) FROM message_labels ml JOIN messages x ON x.id=ml.message_id WHERE x.thread_id=m.thread_id) AS label_ids,COUNT(*) OVER() AS total FROM ranked m WHERE rank=1 ORDER BY received_at DESC LIMIT 50 OFFSET ")
         .push_bind((query.page.unwrap_or(1).clamp(1,10_000)-1)*50);
     let rows = sql
         .build_query_as::<ThreadRow>()
@@ -305,9 +307,17 @@ async fn threads(
         .fetch_one(&state.pool)
         .await?
     };
-    Ok(Json(
-        json!({"threads":rows.into_iter().map(|r| r.thread).collect::<Vec<_>>(),"total":total}),
-    ))
+    let threads = tokio::task::spawn_blocking(move || {
+        rows.into_iter()
+            .map(|mut row| {
+                row.thread.snippet = crate::preview::snippet(&row.text, &row.html);
+                row.thread
+            })
+            .collect::<Vec<_>>()
+    })
+    .await
+    .map_err(anyhow::Error::from)?;
+    Ok(Json(json!({"threads":threads,"total":total})))
 }
 async fn thread(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
     let messages: Vec<MessageView> = sqlx::query_as("SELECT id,thread_id,message_id,subject,sender,sender_email,recipients,cc,envelope_to,text,html,raw,received_at,snoozed_until,(SELECT json_group_array(label_id) FROM message_labels WHERE message_id=messages.id) AS labels FROM messages WHERE thread_id=? ORDER BY received_at,id")
