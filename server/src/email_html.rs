@@ -1,9 +1,57 @@
 use anyhow::Result;
+use html5ever::{
+    tendril::StrTendril,
+    tokenizer::{
+        BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, states::RawKind,
+    },
+};
 use mailparse::ParsedMail;
+use std::cell::RefCell;
+
+/// Read the first base href using HTML tokenization, not text matching: comments
+/// and raw text (scripts, styles, etc.) must not supply a document's base URL.
+fn document_base(html: &str) -> Option<reqwest::Url> {
+    #[derive(Default)]
+    struct BaseSink(RefCell<Option<String>>);
+    impl TokenSink for BaseSink {
+        type Handle = ();
+        fn process_token(&self, token: Token, _: u64) -> TokenSinkResult<()> {
+            if let Token::TagToken(tag) = token
+                && tag.kind == TagKind::StartTag
+            {
+                if &*tag.name == "base"
+                    && self.0.borrow().is_none()
+                    && let Some(href) = tag.attrs.iter().find(|a| &*a.name.local == "href")
+                {
+                    *self.0.borrow_mut() = Some(href.value.to_string());
+                }
+                match tag.name.as_ref() {
+                    "script" => return TokenSinkResult::RawData(RawKind::ScriptData),
+                    "style" | "xmp" | "iframe" | "noembed" | "noframes" => {
+                        return TokenSinkResult::RawData(RawKind::Rawtext);
+                    }
+                    "title" | "textarea" => return TokenSinkResult::RawData(RawKind::Rcdata),
+                    _ => {}
+                }
+            }
+            TokenSinkResult::Continue
+        }
+    }
+    let input = BufferQueue::default();
+    input.push_back(StrTendril::from(html));
+    let tokenizer = Tokenizer::new(BaseSink::default(), Default::default());
+    let _ = tokenizer.feed(&input);
+    tokenizer.end();
+    let base = reqwest::Url::parse(tokenizer.sink.0.into_inner()?.trim()).ok()?;
+    matches!(base.scheme(), "http" | "https").then_some(base)
+}
 
 /// Preserve email presentation inside a script-disabled, CSP-restricted document.
 /// CSS is intentionally retained; this fragment must never enter the app's DOM.
 pub fn sanitize(html: &str) -> String {
+    let relative = document_base(html)
+        .map(ammonia::UrlRelative::RewriteWithBase)
+        .unwrap_or(ammonia::UrlRelative::Deny);
     ammonia::Builder::default()
         .add_tags(&["style", "center", "font"])
         .rm_clean_content_tags(&["style"])
@@ -16,7 +64,7 @@ pub fn sanitize(html: &str) -> String {
         .add_tag_attributes("th", &["bgcolor", "valign"])
         .add_tag_attributes("font", &["color", "face", "size"])
         .url_schemes(["https", "http", "mailto"].into())
-        .url_relative(ammonia::UrlRelative::Deny)
+        .url_relative(relative)
         .link_rel(Some("noopener noreferrer"))
         .set_tag_attribute_value("a", "target", "_blank")
         .clean(html)
