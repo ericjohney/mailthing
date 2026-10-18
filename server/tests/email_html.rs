@@ -4,7 +4,9 @@ const INLINE_LOGO: &str = include_str!("fixtures/inline-logo.eml");
 
 #[test]
 fn restores_forwarded_inline_logo_with_filename_from_saved_mime() {
-    let html = email_html::from_raw(INLINE_LOGO.as_bytes()).unwrap();
+    let rendered = email_html::render(INLINE_LOGO.as_bytes()).unwrap();
+    assert_eq!(rendered.inline_attachment_indices, [0].into());
+    let html = rendered.html;
     assert!(
         html.contains("src=\"data:image/png;base64,iVBORw0KGgo"),
         "{html}"
@@ -12,6 +14,30 @@ fn restores_forwarded_inline_logo_with_filename_from_saved_mime() {
     assert!(html.contains("alt=\"Company logo\""));
     assert!(html.contains("style=\"width:372px;max-width:100%\""));
     assert!(!html.contains("cid:"));
+}
+
+#[test]
+fn only_hides_images_actually_used_in_the_sanitized_body() {
+    for replacement in [
+        "<img src='cid:missing'>",
+        "<a href='cid:ii_logo'>Logo</a>",
+        "<!-- <img src='cid:ii_logo'> -->",
+        "<script>const image = '<img src=\"cid:ii_logo\">';</script>",
+        "<iframe><img src='cid:ii_logo'></iframe>",
+    ] {
+        let raw = INLINE_LOGO.replace(
+            "<img src=\"cid:ii_logo\" alt=\"Company logo\" style=\"width:372px;max-width:100%\">",
+            replacement,
+        );
+        let rendered = email_html::render(raw.as_bytes()).unwrap();
+        assert!(
+            rendered.inline_attachment_indices.is_empty(),
+            "{replacement}"
+        );
+    }
+    let raw = INLINE_LOGO.replace("cid:ii_logo", "CID:ii%5Flogo");
+    let rendered = email_html::render(raw.as_bytes()).unwrap();
+    assert_eq!(rendered.inline_attachment_indices, [0].into());
 }
 
 #[test]

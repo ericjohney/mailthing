@@ -66,7 +66,7 @@ async fn restores_legacy_html_from_raw_without_mutating_or_exposing_raw_mail() {
 }
 
 #[tokio::test]
-async fn renders_existing_inline_images_without_reimporting_or_losing_downloads() {
+async fn hides_existing_inline_images_from_attachments_without_changing_saved_mail() {
     let (_temp, state) = setup().await;
     let raw = include_bytes!("fixtures/inline-logo.eml").to_vec();
     let thread = deliver(&state, raw).await;
@@ -85,13 +85,74 @@ async fn renders_existing_inline_images_without_reimporting_or_losing_downloads(
     assert_eq!(status, StatusCode::OK);
     let html = body["messages"][0]["html"].as_str().unwrap();
     assert!(html.contains("src=\"data:image/png;base64,iVBORw0KGgo"));
-    assert_eq!(body["attachments"][0]["name"], "Outlook-logo.png");
+    assert_eq!(body["attachments"], json!([]));
+    let stored_attachments: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM attachments")
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    assert_eq!(stored_attachments, 1);
     let stored: String = sqlx::query_scalar("SELECT html FROM messages WHERE thread_id=?")
         .bind(thread)
         .fetch_one(&state.pool)
         .await
         .unwrap();
     assert_eq!(stored, "<img alt=\"Company logo\">");
+}
+
+#[tokio::test]
+async fn keeps_real_attachments_even_with_identical_names_and_bytes_to_inline_images() {
+    let (_temp, state) = setup().await;
+    let logo = include_str!("fixtures/inline-logo.eml");
+    let image = logo
+        .split("\n\n")
+        .last()
+        .unwrap()
+        .split('\n')
+        .next()
+        .unwrap();
+    let raw = format!(
+        "From: Sam <sam@example.net>\r\nSubject: Inline logo and files\r\nContent-Type: multipart/mixed; boundary=outer\r\n\r\n--outer\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=invoice.pdf\r\n\r\n%PDF-1.4\r\n--outer\r\n{logo}\r\n--outer\r\nContent-Type: image/png; name=Outlook-logo.png\r\nContent-Disposition: inline; filename=Outlook-logo.png\r\nContent-ID: <unused>\r\nContent-Transfer-Encoding: base64\r\n\r\n{image}\r\n--outer--\r\n"
+    );
+    let thread = deliver(&state, raw.into_bytes()).await;
+    let app = api::router(state.clone());
+    let (status, body) = request(&app, "GET", &format!("/api/threads/{thread}"), json!(null)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body["messages"][0]["html"]
+            .as_str()
+            .unwrap()
+            .contains("data:image/png;base64,")
+    );
+    let attachments = body["attachments"].as_array().unwrap();
+    assert_eq!(attachments.len(), 2);
+    assert!(
+        attachments
+            .iter()
+            .any(|a| a["name"] == "invoice.pdf" && a["id"].as_str().unwrap().ends_with("-0"))
+    );
+    assert!(
+        attachments
+            .iter()
+            .any(|a| a["name"] == "Outlook-logo.png" && a["id"].as_str().unwrap().ends_with("-2"))
+    );
+    for attachment in attachments {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!(
+                        "/api/attachments/{}",
+                        attachment["id"].as_str().unwrap()
+                    ))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let content = response.into_body().collect().await.unwrap().to_bytes();
+        assert!(!content.is_empty());
+    }
 }
 
 #[tokio::test]

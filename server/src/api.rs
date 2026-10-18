@@ -22,7 +22,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::{Execute, QueryBuilder, Row, Sqlite};
-use std::{convert::Infallible, time::Duration};
+use std::{collections::HashSet, convert::Infallible, time::Duration};
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
@@ -325,16 +325,30 @@ async fn thread(State(state): State<AppState>, Path(id): Path<String>) -> ApiRes
     if messages.is_empty() {
         return Err(ApiError::not_found());
     }
-    let messages = tokio::task::spawn_blocking(move || {
-        messages
+    let mut attachments: Vec<AttachmentView> = sqlx::query_as("SELECT a.id,a.message_id,a.name,a.content_type,a.size FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.thread_id=?").bind(&id).fetch_all(&state.pool).await?;
+    let (messages, attachments) = tokio::task::spawn_blocking(move || {
+        let mut inline_attachments = HashSet::new();
+        let messages = messages
             .into_iter()
             .map(|mut message| {
-                message.html = crate::email_html::from_raw(&message.raw)
-                    .unwrap_or_else(|_| crate::email_html::sanitize(&message.html));
+                message.html = match crate::email_html::render(&message.raw) {
+                    Ok(rendered) => {
+                        inline_attachments.extend(
+                            rendered
+                                .inline_attachment_indices
+                                .iter()
+                                .map(|index| format!("{}-{index}", message.id)),
+                        );
+                        rendered.html
+                    }
+                    Err(_) => crate::email_html::sanitize(&message.html),
+                };
                 message.raw = Vec::new();
                 message
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        attachments.retain(|attachment| !inline_attachments.contains(&attachment.id));
+        (messages, attachments)
     })
     .await
     .map_err(|_| {
@@ -343,7 +357,6 @@ async fn thread(State(state): State<AppState>, Path(id): Path<String>) -> ApiRes
             "Could not render message".into(),
         )
     })?;
-    let attachments: Vec<AttachmentView> = sqlx::query_as("SELECT a.id,a.message_id,a.name,a.content_type,a.size FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.thread_id=?").bind(&id).fetch_all(&state.pool).await?;
     let labels: Vec<Label> = sqlx::query_as("SELECT DISTINCT l.* FROM labels l JOIN message_labels ml ON ml.label_id=l.id JOIN messages m ON m.id=ml.message_id WHERE m.thread_id=?").bind(&id).fetch_all(&state.pool).await?;
     Ok(Json(
         json!({"messages":messages,"attachments":attachments,"labels":labels}),

@@ -41,6 +41,7 @@ test('displays a forwarded inline logo while remote images stay blocked', async 
       .evaluate((e) => (e as HTMLImageElement).naturalWidth),
   ).toBe(0);
   expect(remoteRequests).toBe(0);
+  await expect(page.locator('.attachment-section')).toHaveCount(0);
 });
 
 test('keeps offer formatting, fits narrow screens, expands height, and loads images only on request', async ({
