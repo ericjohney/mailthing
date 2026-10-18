@@ -86,6 +86,10 @@ xcodebuild -project Mailthing.xcodeproj -scheme Mailthing \
 The committed Xcode project can also be opened directly. The iOS Checks workflow
 runs these tests on GitHub-hosted macOS runners. This is a public repository;
 never run its CI on homelab self-hosted runners.
+The workflow boots the selected simulator before testing and disables parallel
+simulator clones. Test builds use an unavailable loopback server so the test host
+does not contact the private production mailbox. The HTML test waits for WebKit's
+first layout measurement, including on a cold simulator.
 
 ## New-message notifications
 

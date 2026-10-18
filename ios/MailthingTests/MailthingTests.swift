@@ -116,11 +116,14 @@ final class MailthingTests: XCTestCase {
         XCTAssertFalse(web.configuration.defaultWebpagePreferences.allowsContentJavaScript)
         let html = "<style>.offer { color:rgb(255,0,0) }</style><div id='preview-padding' style='display:none'>hidden padding</div><table width='600' style='width:600px'><tr><td><p class='offer'>Product details</p><div style='height:1200px'>Long email</div></td></tr></table><script>window.emailScriptExecuted = true</script>"
         web.loadHTMLString(SafeEmailHTML.document(html), baseURL: nil)
-        for _ in 0..<100 {
+        // Cold hosted simulators need time to launch WebKit's child processes.
+        // Keep the same layout assertions, but wait for the first real measure.
+        for _ in 0..<450 {
             if coordinator.measuredHeight > 600 && coordinator.measuredHeight < 1000 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         XCTAssertGreaterThan(coordinator.measuredHeight, 600, "The trusted layout script must run even though email scripts are disabled")
+        guard coordinator.measuredHeight > 600 else { return }
         let result = try await evaluate(web, "({width:document.documentElement.scrollWidth * window.visualViewport.scale, viewport:window.visualViewport.width * window.visualViewport.scale, hidden:getComputedStyle(document.getElementById('preview-padding')).display, color:getComputedStyle(document.querySelector('.offer')).color, textAdjust:getComputedStyle(document.getElementById('mailthing-content')).getPropertyValue('-webkit-text-size-adjust'), executed:window.emailScriptExecuted === true})")
         let metrics = try XCTUnwrap(result as? [String: Any], "Unexpected JavaScript result: \(String(describing: result))")
         XCTAssertLessThanOrEqual((metrics["width"] as! NSNumber).doubleValue, (metrics["viewport"] as! NSNumber).doubleValue + 1)
