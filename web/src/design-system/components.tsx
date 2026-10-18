@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   type ButtonHTMLAttributes,
   type HTMLAttributes,
@@ -225,10 +226,15 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = ref.current;
+    const previous = document.activeElement;
     dialog?.showModal();
-    return () => dialog?.close();
+    return () => {
+      dialog?.close();
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus({ preventScroll: true });
+    };
   }, []);
   return (
     <dialog

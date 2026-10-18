@@ -34,7 +34,7 @@ To add an optional collection of fictional example messages to a local instance,
 
 ## Mailbox features
 
-- Threaded conversations; HTML, plain-text, original source, and downloadable attachments.
+- Threaded conversations; HTML, plain-text, original source, PDF/image attachment previews, and downloads.
 - Inbox categories: Primary, Promotions, Social, and Updates.
 - Gmail-style labels instead of folders: a conversation can carry any number of labels, and archiving simply removes Inbox.
 - Stars, importance, read/unread, archive, snooze, Spam, Trash, and permanent deletion from Trash.
@@ -57,6 +57,18 @@ coffee in:anywhere
 Dates are evaluated at midnight UTC. Search excludes Spam and Trash unless `in:anywhere`, `in:spam`, or `in:trash` is included. `label:` matches label names case-insensitively, with hyphens standing in for spaces. Category assignment uses lightweight heuristics by default, or an optional LiteLLM classifier when configured. Your filters override either classifier. Existing spam flags are honored; the server does not claim to perform antivirus scanning or statistical spam detection.
 
 The React interface uses a shared [design system](web/src/design-system/README.md). Semantic palette, typography, spacing, and control tokens live in `web/src/design-system/tokens.css`; reusable controls share hover, focus, and disabled behavior. Screen styles consume those tokens, so new palettes or density changes can share the same components. Appearance is configurable in Settings → General.
+
+## Attachment previews
+
+Click a PDF or image attachment to preview it without leaving the conversation.
+The web viewer supports zoom, fit to width, and PDF page navigation; the separate
+download button keeps the original file available. PDF rendering loads on demand
+and runs locally in the browser. Attachments are fetched from your mailbox server
+and are never sent to an external viewer. Other file types remain downloads, and
+unreadable previews retain a download option.
+
+The iOS app opens PDFs and images in the native Quick Look sheet with zoom and
+sharing. Preview files are removed from temporary storage when the sheet closes.
 
 ## Sending mail
 

@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 struct Account: Codable { var name: String; var email: String }
 struct MailLabel: Codable, Identifiable { var id: String; var name: String; var color: String; var kind: String }
@@ -49,6 +50,22 @@ struct MailMessage: Codable, Identifiable {
 }
 struct Attachment: Codable, Identifiable {
     var id: String; var messageId: String; var name: String; var contentType: String; var size: Int
+    var previewType: UTType? {
+        let mime = contentType.split(separator: ";").first.map(String.init)?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+        let type = mime.isEmpty || mime == "application/octet-stream"
+            ? UTType(filenameExtension: URL(fileURLWithPath: name).pathExtension)
+            : UTType(mimeType: mime)
+        guard let type, type.conforms(to: .pdf) || type.conforms(to: .image) else { return nil }
+        return type
+    }
+    var downloadName: String {
+        var filename = URL(fileURLWithPath: name).lastPathComponent
+        if filename.isEmpty || filename == "." || filename == "/" { filename = "attachment" }
+        if let type = previewType,
+           UTType(filenameExtension: URL(fileURLWithPath: filename).pathExtension)?.conforms(to: type) != true,
+           let suffix = type.preferredFilenameExtension { filename += ".\(suffix)" }
+        return filename
+    }
 }
 struct Conversation: Codable { var messages: [MailMessage]; var attachments: [Attachment]; var labels: [MailLabel] }
 struct DraftAttachment: Codable { var name: String; var contentType: String; var data: String }

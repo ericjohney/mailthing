@@ -2,7 +2,7 @@
 
 A native SwiftUI mail app for iOS 17+, with a compact personal inbox, inbox categories,
 search, stars, swipe-to-archive/trash/read, labels, threaded conversations,
-sanitized HTML, attachment downloads/sharing, compose/reply/reply-all/forward,
+sanitized HTML, PDF/image attachment previews and downloads/sharing, compose/reply/reply-all/forward,
 Cc/Bcc, file attachments, saved drafts, and light/dark appearance.
 
 HTML email preserves the sender's styles and tables, fits fixed-width layouts
@@ -36,6 +36,10 @@ at the top. Tap the sender for full recipient details and the date. Each message
 in a longer conversation retains its own reply/forward controls. Compose keeps
 attachments and Send at the top; closing a message with content offers save,
 discard, or continued editing. There is no bottom navigation toolbar.
+
+Tap a PDF or image attachment to open the native Quick Look preview with zoom,
+PDF page browsing, and sharing. Other files open the share sheet. Files load from
+your mailbox server and temporary preview files are removed on dismissal.
 
 Settings groups notifications, sorting, appearance, connection, and app details.
 Notification controls show actual iOS permission state rather than a simulated

@@ -3,6 +3,19 @@ import WebKit
 @testable import Mailthing
 
 final class MailthingTests: XCTestCase {
+    func testAttachmentPreviewUsesMIMEAndFallsBackToGenericFileExtensions() {
+        for (name, mime) in [("scan", "application/pdf"), ("photo", "image/png"), ("invoice.PDF", "application/octet-stream"), ("photo.JPG", "")] {
+            let attachment = Attachment(id: "a", messageId: "m", name: name, contentType: mime, size: 1)
+            XCTAssertNotNil(attachment.previewType, name)
+            XCTAssertFalse(URL(fileURLWithPath: attachment.downloadName).pathExtension.isEmpty, "Quick Look needs a matching extension")
+        }
+        for (name, mime) in [("note.txt", "text/plain"), ("message.html", "text/html"), ("fake.pdf", "application/zip")] {
+            let attachment = Attachment(id: "a", messageId: "m", name: name, contentType: mime, size: 1)
+            XCTAssertNil(attachment.previewType, name)
+        }
+        let attachment = Attachment(id: "a", messageId: "m", name: "../../private/file.html", contentType: "application/pdf", size: 1)
+        XCTAssertEqual(attachment.downloadName, "file.html.pdf")
+    }
     func testPrivateServerURLRequiresTLSAndNoCredentials() throws {
         XCTAssertEqual(try MailAPI.serverURL("https://mailthing.ericj5.com").host, "mailthing.ericj5.com")
         XCTAssertNoThrow(try MailAPI.serverURL("http://localhost:9005"))

@@ -1,5 +1,7 @@
 import SwiftUI
 import WebKit
+import QuickLook
+import UniformTypeIdentifiers
 
 struct ConversationView: View {
     let id: String
@@ -9,7 +11,8 @@ struct ConversationView: View {
     @State private var error: String?
     @State private var compose: Draft?
     @State private var share: SharedFile?
-    @State private var downloading = false
+    @State private var preview: URL?
+    @State private var loadingAttachment: String?
     private var isSpam: Bool { conversation?.messages.contains { $0.labels.contains("SPAM") } == true }
     private var latestMessage: MailMessage? { conversation?.messages.last }
     var body: some View {
@@ -37,18 +40,20 @@ struct ConversationView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else { EmailBody(html: message.html) }
                             ForEach(conversation.attachments.filter { $0.messageId == message.id }) { attachment in
-                                Button { Task { await download(attachment) } } label: {
+                                Button { Task { await openAttachment(attachment) } } label: {
                                     HStack(spacing: 12) {
-                                        Image(systemName: "doc").font(.title3)
+                                        Image(systemName: attachment.previewType?.conforms(to: .image) == true ? "photo" : "doc").font(.title3)
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text(attachment.name).font(.subheadline).lineLimit(2)
                                             Text(ByteCountFormatter.string(fromByteCount: Int64(attachment.size), countStyle: .file)).font(.caption).foregroundStyle(.secondary)
                                         }
                                         Spacer()
-                                        Image(systemName: "arrow.down.to.line")
+                                        if loadingAttachment == attachment.id { ProgressView() }
+                                        else { Image(systemName: attachment.previewType == nil ? "arrow.down.to.line" : "eye") }
                                     }.foregroundStyle(.primary).padding(14)
                                         .background(Color.mailSurface, in: RoundedRectangle(cornerRadius: 10))
-                                }.disabled(downloading)
+                                }.disabled(loadingAttachment != nil)
+                                    .accessibilityLabel("\(attachment.previewType == nil ? "Download" : "Preview") \(attachment.name)")
                             }
                             if conversation.messages.count > 1 {
                                 HStack {
@@ -72,7 +77,13 @@ struct ConversationView: View {
         .task(id: id) { await load() }
         .refreshable { await load() }
         .sheet(item: $compose) { ComposeView(initial: $0) }
-        .sheet(item: $share) { ShareSheet(url: $0.url) }
+        .sheet(item: $share) { file in
+            ShareSheet(url: file.url).onDisappear { try? FileManager.default.removeItem(at: file.url.deletingLastPathComponent()) }
+        }
+        .quickLookPreview($preview)
+        .onChange(of: preview) { previous, current in
+            if let previous, current == nil { try? FileManager.default.removeItem(at: previous.deletingLastPathComponent()) }
+        }
         .tint(.mailAction)
     }
 
@@ -160,14 +171,17 @@ struct ConversationView: View {
         } catch { self.error = error.localizedDescription }
     }
     private func move(_ action: String) async { await store.action(id, action); if store.error == nil { dismiss() } else { error = store.error } }
-    private func download(_ attachment: Attachment) async {
-        downloading = true; defer { downloading = false }
+    private func openAttachment(_ attachment: Attachment) async {
+        loadingAttachment = attachment.id; defer { loadingAttachment = nil }
         do {
             let data = try await store.api.data("attachments/\(attachment.id)")
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let url = folder.appendingPathComponent(URL(fileURLWithPath: attachment.name).lastPathComponent)
-            try data.write(to: url, options: .atomic); share = SharedFile(url: url)
+            let url = folder.appendingPathComponent(attachment.downloadName)
+            do { try data.write(to: url, options: .atomic) }
+            catch { try? FileManager.default.removeItem(at: folder); throw error }
+            if attachment.previewType != nil { preview = url }
+            else { share = SharedFile(url: url) }
         } catch { self.error = error.localizedDescription }
     }
 }

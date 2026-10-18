@@ -17,11 +17,13 @@ import {
   Tag,
   Trash2,
 } from 'lucide-react';
-import { encodeFile, fileSize, messageDate } from './api';
+import { encodeFile, messageDate } from './api';
 import { EmailContent } from './mailbox/EmailContent';
+import { AttachmentCard, AttachmentPreview } from './mailbox/AttachmentPreview';
 import { categories, placeLabels } from './mailbox/navigation';
 import {
   emptyDraft,
+  type Attachment,
   type Conversation as ConversationData,
   type Draft,
   type Label,
@@ -47,6 +49,7 @@ export function Conversation({
   report: (message: string) => void;
 }) {
   const [plainText, setPlainText] = useState(false);
+  const [preview, setPreview] = useState<Attachment | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState(false);
   const [labelMenu, setLabelMenu] = useState(false);
@@ -308,21 +311,11 @@ export function Conversation({
                           {data.attachments
                             .filter((a) => a.message_id === message.id)
                             .map((attachment) => (
-                              <a
+                              <AttachmentCard
                                 key={attachment.id}
-                                href={`/api/attachments/${attachment.id}`}
-                                className="attachment-card"
-                                download={attachment.name}
-                              >
-                                <div className="attachment-icon">
-                                  <Paperclip size={24} />
-                                </div>
-                                <div>
-                                  <strong>{attachment.name}</strong>
-                                  <span>{fileSize(attachment.size)}</span>
-                                </div>
-                                <Download size={17} />
-                              </a>
+                                attachment={attachment}
+                                onPreview={setPreview}
+                              />
                             ))}
                         </div>
                       </div>
@@ -357,6 +350,9 @@ export function Conversation({
           </Button>
         </div>
       </div>
+      {preview && (
+        <AttachmentPreview key={preview.id} attachment={preview} onClose={() => setPreview(null)} />
+      )}
     </>
   );
 }
