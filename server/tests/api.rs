@@ -66,6 +66,35 @@ async fn restores_legacy_html_from_raw_without_mutating_or_exposing_raw_mail() {
 }
 
 #[tokio::test]
+async fn renders_existing_inline_images_without_reimporting_or_losing_downloads() {
+    let (_temp, state) = setup().await;
+    let raw = include_bytes!("fixtures/inline-logo.eml").to_vec();
+    let thread = deliver(&state, raw).await;
+    sqlx::query("UPDATE messages SET html='<img alt=\"Company logo\">' WHERE thread_id=?")
+        .bind(&thread)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    let (status, body) = request(
+        &api::router(state.clone()),
+        "GET",
+        &format!("/api/threads/{thread}"),
+        json!(null),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let html = body["messages"][0]["html"].as_str().unwrap();
+    assert!(html.contains("src=\"data:image/png;base64,iVBORw0KGgo"));
+    assert_eq!(body["attachments"][0]["name"], "Outlook-logo.png");
+    let stored: String = sqlx::query_scalar("SELECT html FROM messages WHERE thread_id=?")
+        .bind(thread)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    assert_eq!(stored, "<img alt=\"Company logo\">");
+}
+
+#[tokio::test]
 async fn mailbox_search_bulk_actions_labels_and_trash() {
     let (_temp, state) = setup().await;
     let first = deliver(

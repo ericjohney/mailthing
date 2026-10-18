@@ -1,0 +1,27 @@
+From: Nancy <nancy@example.net>
+To: alex@example.com
+Subject: Forwarded home performance inspection
+Message-ID: <inline-logo@example.net>
+MIME-Version: 1.0
+Content-Type: multipart/related; boundary=related
+
+--related
+Content-Type: multipart/alternative; boundary=alternative
+
+--alternative
+Content-Type: text/plain; charset=utf-8
+
+Your inspection is due.
+--alternative
+Content-Type: text/html; charset=utf-8
+
+<p>Your inspection is due.</p><img src="cid:ii_logo" alt="Company logo" style="width:372px;max-width:100%">
+--alternative--
+--related
+Content-Type: image/png; name="Outlook-logo.png"
+Content-Disposition: inline; filename="Outlook-logo.png"
+Content-ID: <ii_logo>
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=
+--related--

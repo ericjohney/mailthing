@@ -1,4 +1,47 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+test('displays a forwarded inline logo while remote images stay blocked', async ({ page }) => {
+  let remoteRequests = 0;
+  await page.route('https://images.example/**', async (route) => {
+    remoteRequests++;
+    await route.abort();
+  });
+  const raw = readFileSync('server/tests/fixtures/inline-logo.eml', 'utf8').replace(
+    '</p>',
+    '</p><img src="https://images.example/tracker.png" alt="Remote tracker">',
+  );
+  const response = await page.request.post('/api/import', {
+    data: { raw: Buffer.from(raw).toString('base64') },
+  });
+  expect(response.ok()).toBeTruthy();
+  let threadId = '';
+  await expect
+    .poll(async () => {
+      const { threads } = await (
+        await page.request.get(
+          '/api/threads?q=subject:%22Forwarded%20home%20performance%20inspection%22',
+        )
+      ).json();
+      threadId = threads[0]?.id ?? '';
+      return threads.length;
+    })
+    .toBe(1);
+  await page.goto(`/#label=INBOX&thread=${threadId}`);
+  const email = page.frameLocator('.email-html');
+  await expect(email.getByAltText('Company logo')).toBeVisible();
+  await expect
+    .poll(() =>
+      email.getByAltText('Company logo').evaluate((e) => (e as HTMLImageElement).naturalWidth),
+    )
+    .toBe(1);
+  expect(
+    await email
+      .getByAltText('Remote tracker')
+      .evaluate((e) => (e as HTMLImageElement).naturalWidth),
+  ).toBe(0);
+  expect(remoteRequests).toBe(0);
+});
 
 test('keeps offer formatting, fits narrow screens, expands height, and loads images only on request', async ({
   page,

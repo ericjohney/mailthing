@@ -1,5 +1,50 @@
 use mailthing::email_html;
 
+const INLINE_LOGO: &str = include_str!("fixtures/inline-logo.eml");
+
+#[test]
+fn restores_forwarded_inline_logo_with_filename_from_saved_mime() {
+    let html = email_html::from_raw(INLINE_LOGO.as_bytes()).unwrap();
+    assert!(
+        html.contains("src=\"data:image/png;base64,iVBORw0KGgo"),
+        "{html}"
+    );
+    assert!(html.contains("alt=\"Company logo\""));
+    assert!(html.contains("style=\"width:372px;max-width:100%\""));
+    assert!(!html.contains("cid:"));
+}
+
+#[test]
+fn resolves_escaped_content_ids_but_rejects_unbacked_and_active_sources() {
+    let raw = INLINE_LOGO.replace(
+        "cid:ii_logo\"",
+        "CID:ii%5Flogo\"><img src=\"cid:missing\"><img src=\"cid:ii%ZZlogo\"><img src=\"data:text/html;base64,PHNjcmlwdD4=\"><a href=\"cid:ii_logo\">download</a><img src=\"https://images.example/remote.png\" onerror=\"alert(1)\"",
+    );
+    let html = email_html::from_raw(raw.as_bytes()).unwrap();
+    assert_eq!(html.matches("src=\"data:image/png;base64,").count(), 1);
+    assert!(html.contains("https://images.example/remote.png"));
+    for denied in ["cid:", "CID:", "data:text/html", "onerror"] {
+        assert!(!html.contains(denied), "{html}");
+    }
+
+    for content_type in ["image/svg+xml", "text/html", "application/pdf"] {
+        let raw = INLINE_LOGO.replace("image/png", content_type);
+        let html = email_html::from_raw(raw.as_bytes()).unwrap();
+        assert!(!html.contains("src="), "{html}");
+    }
+    assert!(!email_html::sanitize("<img src='cid:ii_logo'><a href='cid:ii_logo'>link</a><img src='data:image/png;base64,AAAA'>").contains("src="));
+}
+
+#[test]
+fn does_not_resolve_images_from_attached_messages() {
+    let raw = format!(
+        "Content-Type: multipart/mixed; boundary=outer\r\n\r\n--outer\r\nContent-Type: text/html\r\n\r\n<img src='cid:ii_logo'>\r\n--outer\r\nContent-Type: message/rfc822\r\nContent-Disposition: attachment; filename=forwarded.eml\r\n\r\n{INLINE_LOGO}\r\n--outer--\r\n"
+    );
+    let html = email_html::from_raw(raw.as_bytes()).unwrap();
+    assert!(!html.contains("src="));
+    assert!(!html.contains("Your inspection"));
+}
+
 #[test]
 fn resolves_parking_scan_code_against_email_base_without_retaining_base_tag() {
     let raw = b"Content-Type: text/html; charset=utf-8\r\n\r\n<head><BASE HREF=\"https://parking.example/Email/\"></head><body><img src=\"/Email/%20GenerateBarCode?barcodeNum=TEST123&amp;format=aztec\" alt=\"aztec code\"><img src=\"../Content/logo.png\"><a href=\"reservation/123\">Pass</a><script>alert(1)</script></body>";
