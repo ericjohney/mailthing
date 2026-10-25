@@ -31,11 +31,7 @@ pub fn parse(query: &str) -> Result<Vec<Term>> {
     let mut result = Vec::new();
     for word in words {
         if let Some((field, value)) = word.split_once(':') {
-            if [
-                "from", "to", "subject", "is", "has", "in", "label", "category",
-            ]
-            .contains(&field)
-            {
+            if ["from", "to", "subject", "is", "has", "in", "label"].contains(&field) {
                 result.push(Term::Field(field.into(), value.into()));
                 continue;
             }
@@ -118,11 +114,6 @@ pub fn append(builder: &mut QueryBuilder<'_, Sqlite>, terms: &[Term]) {
                         .push(" OR l.name=")
                         .push_bind(value.replace('-', " "))
                         .push("))");
-                }
-                "category" if labels::category(value).is_some() => {
-                    builder
-                        .push(" AND ")
-                        .push(labels::has(labels::category(value).expect("Checked above")));
                 }
                 _ => {
                     builder.push(" AND 0=1");

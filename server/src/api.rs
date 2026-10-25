@@ -57,6 +57,7 @@ pub fn router(state: AppState) -> Router {
     let api = Router::new()
         .route("/settings", get(settings).put(save_account))
         .route("/threads", get(threads))
+        .route("/autofill/messages", get(autofill_messages))
         .route("/threads/{id}", get(thread))
         .route("/actions", post(actions))
         .route("/labels", get(labels).post(create_label))
@@ -232,11 +233,24 @@ async fn save_account(
     Ok(Json(account))
 }
 
+/// Read-only, bounded input for the iOS code provider. Never marks mail read,
+/// includes sent/spam/trash, exposes raw MIME, or returns historical imports.
+async fn autofill_messages(State(state): State<AppState>) -> ApiResult<Json<Value>> {
+    let now = db::now();
+    let rows = sqlx::query("SELECT m.id,m.sender_email,m.subject,substr(m.text,1,12000) AS text,substr(m.html,1,12000) AS html,m.received_at FROM messages m JOIN jobs j ON j.id=m.id WHERE m.received_at>=? AND m.received_at<=? AND j.kind='incoming' AND j.import_state IS NULL AND NOT EXISTS(SELECT 1 FROM message_labels ml WHERE ml.message_id=m.id AND ml.label_id IN ('SPAM','TRASH','SENT')) ORDER BY m.received_at DESC,m.id DESC LIMIT 40")
+        .bind(now - 600_000).bind(now).fetch_all(&state.pool).await?;
+    let messages: Vec<Value> = rows.iter().map(|row| {
+        let text: String = row.get("text");
+        let text = if text.trim().is_empty() { crate::preview::html_text(&row.get::<String,_>("html")) } else { text };
+        json!({"id":row.get::<String,_>("id"),"sender_email":row.get::<String,_>("sender_email"),"subject":row.get::<String,_>("subject"),"text":text,"received_at":row.get::<i64,_>("received_at")})
+    }).collect();
+    Ok(Json(json!({"messages":messages})))
+}
+
 #[derive(Deserialize, Default)]
 struct ListQuery {
     /// A label id, or `ALL` for every conversation outside spam and trash.
     label: Option<String>,
-    category: Option<String>,
     q: Option<String>,
     page: Option<i64>,
 }
@@ -268,16 +282,6 @@ async fn threads(
         if label != "ALL" {
             sql.push(" AND EXISTS(SELECT 1 FROM message_labels ml WHERE ml.message_id=m.id AND ml.label_id=")
                 .push_bind(label.to_string())
-                .push(")");
-        }
-        if label == labels::INBOX
-            && let Some(category) = query.category
-        {
-            if !labels::CATEGORIES.contains(&category.as_str()) {
-                return Err(ApiError::bad("Unknown inbox category"));
-            }
-            sql.push(" AND EXISTS(SELECT 1 FROM message_labels ml WHERE ml.message_id=m.id AND ml.label_id=")
-                .push_bind(category)
                 .push(")");
         }
     }
@@ -369,6 +373,7 @@ struct Action {
     action: String,
     #[serde(default)]
     value: String,
+    label_ids: Option<Vec<String>>,
     until: Option<i64>,
 }
 async fn actions(
@@ -380,9 +385,47 @@ async fn actions(
     }
     use labels::{IMPORTANT, INBOX, SNOOZED, SPAM, STARRED, TRASH, UNREAD};
     let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+    if action.action == "set_labels" {
+        let selected = action
+            .label_ids
+            .as_ref()
+            .ok_or_else(|| ApiError::bad("Choose tags, or an empty list to remove them"))?;
+        if selected.len() > 100 {
+            return Err(ApiError::bad("Choose at most 100 tags"));
+        }
+        for label in selected {
+            let valid: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM labels WHERE id=? AND kind='user')",
+            )
+            .bind(label)
+            .fetch_one(&mut *tx)
+            .await?;
+            if !valid {
+                return Err(ApiError::bad("A selected tag no longer exists"));
+            }
+        }
+    }
     for id in &action.thread_ids {
         // Moving a conversation anywhere ends its snooze.
         let (add, remove): (Option<&str>, &[&str]) = match action.action.as_str() {
+            "set_labels" => {
+                let selected = action.label_ids.as_ref().expect("Validated above");
+                let current: Vec<String> = sqlx::query_scalar("SELECT DISTINCT l.id FROM labels l JOIN message_labels ml ON ml.label_id=l.id JOIN messages m ON m.id=ml.message_id WHERE m.thread_id=? AND l.kind='user'")
+                    .bind(id).fetch_all(&mut *tx).await?;
+                for label in &current {
+                    if !selected.contains(label) {
+                        labels::remove(&mut tx, id, &[label]).await?;
+                        sorting::remember(&mut tx, id, label, false).await?;
+                    }
+                }
+                for label in selected.iter().collect::<HashSet<_>>() {
+                    labels::add(&mut tx, id, label).await?;
+                    if !current.contains(label) {
+                        sorting::remember(&mut tx, id, label, true).await?;
+                    }
+                }
+                continue;
+            }
             "label" | "unlabel" => {
                 let exists: bool = sqlx::query_scalar(
                     "SELECT EXISTS(SELECT 1 FROM labels WHERE id=? AND kind='user')",
@@ -399,17 +442,6 @@ async fn actions(
                     labels::remove(&mut tx, id, &[&action.value]).await?;
                 }
                 sorting::remember(&mut tx, id, &action.value, action.action == "label").await?;
-                continue;
-            }
-            "category" => {
-                if !labels::CATEGORIES.contains(&action.value.as_str()) {
-                    return Err(ApiError::bad("Choose a valid category"));
-                }
-                for category in labels::CATEGORIES {
-                    sorting::remember(&mut tx, id, category, category == action.value).await?;
-                }
-                labels::remove(&mut tx, id, &labels::CATEGORIES).await?;
-                labels::add(&mut tx, id, &action.value).await?;
                 continue;
             }
             "delete" => {
@@ -565,11 +597,8 @@ async fn save_sorting_memory(
         .bind(&id)
         .fetch_optional(&mut *tx)
         .await?;
-    if kind.as_deref() != Some("user")
-        && !labels::CATEGORIES.contains(&id.as_str())
-        && id != labels::SPAM
-    {
-        return Err(ApiError::bad("Choose a user label, inbox category or Spam"));
+    if kind.as_deref() != Some("user") && id != labels::SPAM {
+        return Err(ApiError::bad("Choose a user label or Spam"));
     }
     sqlx::query("INSERT INTO sorting_memory(label_id,guidance) VALUES(?,?) ON CONFLICT(label_id) DO UPDATE SET guidance=excluded.guidance")
         .bind(&id).bind(input.guidance.trim()).execute(&mut *tx).await?;
@@ -601,7 +630,6 @@ async fn save_rule(
         || !["from", "to", "subject", "body"].contains(&rule.field.as_str())
         || ![
             "label",
-            "category",
             "archive",
             "spam",
             "not_spam",
@@ -614,9 +642,6 @@ async fn save_rule(
         return Err(ApiError::bad(
             "Enter a rule name, condition, and supported action",
         ));
-    }
-    if rule.action == "category" && !labels::CATEGORIES.contains(&rule.value.as_str()) {
-        return Err(ApiError::bad("Choose a valid category"));
     }
     if rule.action == "label" {
         let exists: bool =

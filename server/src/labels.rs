@@ -11,30 +11,8 @@ pub const UNREAD: &str = "UNREAD";
 pub const STARRED: &str = "STARRED";
 pub const IMPORTANT: &str = "IMPORTANT";
 pub const SNOOZED: &str = "SNOOZED";
-pub const CATEGORY_PERSONAL: &str = "CATEGORY_PERSONAL";
-pub const CATEGORY_PROMOTIONS: &str = "CATEGORY_PROMOTIONS";
-pub const CATEGORY_SOCIAL: &str = "CATEGORY_SOCIAL";
-pub const CATEGORY_UPDATES: &str = "CATEGORY_UPDATES";
-/// Labels describing where a message sits and how it was handled, as opposed to its
-/// category or the owner's own labels. An import may set these directly.
+/// Mailbox states that an import may set directly.
 pub const STATE: [&str; 7] = [INBOX, SENT, SPAM, TRASH, UNREAD, STARRED, IMPORTANT];
-pub const CATEGORIES: [&str; 4] = [
-    CATEGORY_PERSONAL,
-    CATEGORY_PROMOTIONS,
-    CATEGORY_SOCIAL,
-    CATEGORY_UPDATES,
-];
-
-/// Maps a search keyword such as `social` to its category label.
-pub fn category(name: &str) -> Option<&'static str> {
-    match name.to_ascii_lowercase().as_str() {
-        "primary" | "personal" => Some(CATEGORY_PERSONAL),
-        "promotions" => Some(CATEGORY_PROMOTIONS),
-        "social" => Some(CATEGORY_SOCIAL),
-        "updates" => Some(CATEGORY_UPDATES),
-        _ => None,
-    }
-}
 
 /// SQL condition: message `m` has the system label `id`. Only call with constants.
 pub fn has(id: &'static str) -> String {

@@ -7,8 +7,8 @@ final class MailStore: ObservableObject {
     @Published var drafts: [Draft] = []
     @Published var settings: Settings?
     @Published var label = "INBOX"
-    @Published var category = "CATEGORY_PERSONAL"
     @Published var search = ""
+    @Published var unreadOnly = false
     @Published var path: [String] = []
     @Published var error: String?
     @Published var loading = false
@@ -22,7 +22,10 @@ final class MailStore: ObservableObject {
     private var pendingThread: String?
     var api: MailAPI { MailAPI(baseURL: (try? MailAPI.serverURL(server)) ?? Self.defaultURL) }
     static let defaultURL = URL(string: Bundle.main.object(forInfoDictionaryKey: "MailthingServerURL") as? String ?? "https://mailthing.ericj5.com")!
-    init() { server = UserDefaults.standard.string(forKey: "server") ?? Self.defaultURL.absoluteString }
+    init() {
+        server = UserDefaults.standard.string(forKey: "server") ?? Self.defaultURL.absoluteString
+        CodeMailbox.configure(server: api.baseURL)
+    }
     var unread: Int { settings?.counts["INBOX"]?.unread ?? 0 }
     var title: String {
         if !search.isEmpty { return "Search results" }
@@ -31,7 +34,7 @@ final class MailStore: ObservableObject {
     func refresh() async {
         generation += 1
         let current = generation
-        let selectedLabel = label, selectedCategory = category, selectedSearch = search
+        let selectedLabel = label, selectedSearch = effectiveSearch
         loading = true
         defer { if current == generation { loading = false } }
         do {
@@ -42,7 +45,7 @@ final class MailStore: ObservableObject {
                 guard current == generation else { return }
                 drafts = value; settings = profile; threads = []; total = value.count
             } else {
-                let result: ThreadPage = try await api.request("threads", query: query(label: selectedLabel, category: selectedCategory, search: selectedSearch, page: 1))
+                let result: ThreadPage = try await api.request("threads", query: query(label: selectedLabel, search: selectedSearch, page: 1))
                 let profile = try await account
                 guard current == generation else { return }
                 threads = result.threads; total = result.total; settings = profile; page = 1
@@ -50,15 +53,18 @@ final class MailStore: ObservableObject {
             error = nil
             try? await UNUserNotificationCenter.current().setBadgeCount(unread)
             if let pendingThread { path = [pendingThread]; self.pendingThread = nil }
+            try? await CodeAutoFill.sync(server: api.baseURL)
         } catch {
             guard current == generation, !(error is CancellationError), (error as? URLError)?.code != .cancelled else { return }
             self.error = error.localizedDescription
         }
     }
-    private func query(label: String, category: String, search: String, page: Int) -> [URLQueryItem] {
+    var effectiveSearch: String {
+        [search, unreadOnly ? "is:unread" : ""].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+    private func query(label: String, search: String, page: Int) -> [URLQueryItem] {
         var result = [URLQueryItem(name: "label", value: label), URLQueryItem(name: "page", value: String(page))]
         if !search.isEmpty { result.append(URLQueryItem(name: "q", value: search)) }
-        else if label == "INBOX" && !category.isEmpty { result.append(URLQueryItem(name: "category", value: category)) }
         return result
     }
     func loadMore() async {
@@ -67,14 +73,14 @@ final class MailStore: ObservableObject {
         loading = true
         defer { if current == generation { loading = false } }
         do {
-            let result: ThreadPage = try await api.request("threads", query: query(label: label, category: category, search: search, page: page + 1))
+            let result: ThreadPage = try await api.request("threads", query: query(label: label, search: effectiveSearch, page: page + 1))
             guard current == generation else { return }
             page += 1
             let ids = Set(threads.map(\.id))
             threads += result.threads.filter { !ids.contains($0.id) }
         } catch { if current == generation { self.error = error.localizedDescription } }
     }
-    func select(_ label: String) { self.label = label; search = ""; path = [] }
+    func select(_ label: String) { self.label = label; search = ""; unreadOnly = false; path = [] }
     func action(_ id: String, _ action: String, value: String = "", until: Int64? = nil) async {
         do { try await api.action(id, action, value: value, until: until); await refresh() }
         catch { self.error = error.localizedDescription }
@@ -86,6 +92,7 @@ final class MailStore: ObservableObject {
             let _: EmptyReply = try await api.request("push/devices/\(deviceToken)", method: "DELETE")
         }
         server = url.absoluteString; UserDefaults.standard.set(server, forKey: "server")
+        CodeMailbox.configure(server: url)
         settings = profile; path = []; select("INBOX")
         await refresh(); await registerPush()
     }

@@ -144,3 +144,13 @@ fn payload_is_bounded_and_opens_the_right_thread() {
     assert_eq!(payload["aps"]["alert"]["body"].as_str().unwrap().len(), 240);
     assert!(serde_json::to_vec(&payload).unwrap().len() < 4096);
 }
+
+#[test]
+fn different_conversations_share_a_group_but_keep_their_destinations() {
+    let first = push::payload("Sam", "Coffee?", "Saturday", "first-thread", 1);
+    let second = push::payload("Nora", "Photos", "Our trip", "second-thread", 2);
+    assert_eq!(first["aps"]["thread-id"], "mailthing.inbox");
+    assert_eq!(first["aps"]["thread-id"], second["aps"]["thread-id"]);
+    assert_eq!(first["thread_id"], "first-thread");
+    assert_eq!(second["thread_id"], "second-thread");
+}

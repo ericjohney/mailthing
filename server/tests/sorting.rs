@@ -37,8 +37,8 @@ async fn mock(response: Value) -> (Sorter, Arc<Mutex<Vec<Value>>>, tokio::task::
         task,
     )
 }
-fn completion(category: &str, labels: Value) -> Value {
-    json!({"choices":[{"finish_reason":"stop","message":{"content":json!({"category":category,"label_ids":labels,"spam":{"is_spam":false,"confidence":0.99}}).to_string()}}]})
+fn completion(labels: Value) -> Value {
+    json!({"choices":[{"finish_reason":"stop","message":{"content":json!({"label_ids":labels,"spam":{"is_spam":false,"confidence":0.99}}).to_string()}}]})
 }
 
 #[tokio::test]
@@ -46,7 +46,7 @@ async fn sorter_uses_owner_memory_and_bounds_email_content() {
     let (_temp, state) = setup().await;
     sqlx::query("INSERT INTO labels(id,name,kind) VALUES('finance','Finance','user'),('unused','Unused','user')").execute(&state.pool).await.unwrap();
     sqlx::query("INSERT INTO sorting_memory(label_id,guidance) VALUES('finance','Tax and banking correspondence')").execute(&state.pool).await.unwrap();
-    let (sorter, requests, task) = mock(completion("CATEGORY_UPDATES", json!(["finance"]))).await;
+    let (sorter, requests, task) = mock(completion(json!(["finance"]))).await;
     let mut parsed = state
         .pipeline
         .run(
@@ -57,7 +57,12 @@ async fn sorter_uses_owner_memory_and_bounds_email_content() {
         .unwrap();
     sorter.classify(&state.pool, &mut parsed).await.unwrap();
     assert!(parsed.has_label("finance"));
-    assert_eq!(parsed.category(), Some("CATEGORY_UPDATES"));
+    assert!(!parsed.labels.iter().any(|l| l.starts_with("CATEGORY_")));
+    assert!(
+        requests.lock().unwrap()[0]["response_format"]["json_schema"]["schema"]["properties"]
+            .get("category")
+            .is_none()
+    );
     let request = requests.lock().unwrap()[0].clone();
     assert_eq!(request["model"], "custom-luna-alias");
     assert_eq!(request["stream"], true);
@@ -91,8 +96,8 @@ async fn sorter_uses_owner_memory_and_bounds_email_content() {
 #[tokio::test]
 async fn rules_override_llm_and_predictions_do_not_teach_memory() {
     let (_temp, state) = setup().await;
-    sqlx::query("INSERT INTO rules(id,name,field,contains,action,value) VALUES('rule','Personal','subject','invoice','category','CATEGORY_PERSONAL')").execute(&state.pool).await.unwrap();
-    let (sorter, _, task) = mock(completion("CATEGORY_UPDATES", json!([]))).await;
+    sqlx::query("INSERT INTO rules(id,name,field,contains,action,value) VALUES('rule','Archive','subject','invoice','archive','')").execute(&state.pool).await.unwrap();
+    let (sorter, _, task) = mock(completion(json!([]))).await;
     let id = db::enqueue(
         &state.pool,
         mail("Invoice", "rules-llm", "A bill"),
@@ -109,15 +114,15 @@ async fn rules_override_llm_and_predictions_do_not_teach_memory() {
             .fetch_all(&state.pool)
             .await
             .unwrap();
-    assert!(labels.iter().any(|l| l == "CATEGORY_PERSONAL"));
-    assert!(!labels.iter().any(|l| l == "CATEGORY_UPDATES"));
+    assert!(!labels.iter().any(|l| l == "INBOX"));
+    assert!(!labels.iter().any(|l| l.starts_with("CATEGORY_")));
     let category: String =
         sqlx::query_scalar("SELECT category FROM sorting_results WHERE message_id=?")
             .bind(&id)
             .fetch_one(&state.pool)
             .await
             .unwrap();
-    assert_eq!(category, "CATEGORY_UPDATES");
+    assert_eq!(category, "");
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sorting_examples")
         .fetch_one(&state.pool)
         .await
@@ -129,8 +134,8 @@ async fn rules_override_llm_and_predictions_do_not_teach_memory() {
 #[tokio::test]
 async fn invalid_results_and_provider_errors_keep_mail_deliverable() {
     for response in [
-        completion("CATEGORY_UPDATES", json!(["TRASH"])),
-        completion("INVALID", json!([])),
+        completion(json!(["TRASH"])),
+        json!({"choices":[{"finish_reason":"stop","message":{"content":"{\"label_ids\":[],\"unexpected\":true}"}}]}),
         json!({"error":"provider down"}),
     ] {
         let (_temp, state) = setup().await;
@@ -151,29 +156,31 @@ async fn invalid_results_and_provider_errors_keep_mail_deliverable() {
             .await
             .unwrap();
         assert_eq!(status, "completed");
-        let category: String = sqlx::query_scalar(
-            "SELECT label_id FROM message_labels WHERE message_id=? AND label_id LIKE 'CATEGORY_%'",
-        )
-        .bind(&id)
-        .fetch_one(&state.pool)
-        .await
-        .unwrap();
-        assert_eq!(category, "CATEGORY_PERSONAL");
+        let labels: Vec<String> =
+            sqlx::query_scalar("SELECT label_id FROM message_labels WHERE message_id=?")
+                .bind(&id)
+                .fetch_all(&state.pool)
+                .await
+                .unwrap();
+        assert!(labels.iter().any(|l| l == "INBOX"));
+        assert!(!labels.iter().any(|l| l.starts_with("CATEGORY_")));
         task.abort();
     }
 }
 
 #[test]
 fn streaming_parser_requires_a_complete_valid_response() {
-    let content = json!({"category":"CATEGORY_PERSONAL","label_ids":[],"spam":{"is_spam":false,"confidence":0.99}}).to_string();
+    let content = json!({"label_ids":[],"spam":{"is_spam":false,"confidence":0.99}}).to_string();
     let sse = format!(
         "data: {}\r\n\r\ndata: {}\n\ndata: [DONE]\n\n",
         json!({"choices":[{"delta":{"content":content}}]}),
         json!({"choices":[{"delta":{},"finish_reason":"stop"}]})
     );
-    assert_eq!(
-        parse_decision(sse.as_bytes(), true).unwrap().category,
-        "CATEGORY_PERSONAL"
+    assert!(
+        parse_decision(sse.as_bytes(), true)
+            .unwrap()
+            .label_ids
+            .is_empty()
     );
     assert!(parse_decision(sse.split("\r\n").next().unwrap().as_bytes(), true).is_err());
     assert!(parse_decision(b"data: {\"error\":\"bad\"}\n\n", true).is_err());
@@ -198,7 +205,7 @@ async fn provider_timeout_falls_back_and_spam_skips_the_provider() {
             async move {
                 captured.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                Json(completion("CATEGORY_UPDATES", json!([])))
+                Json(completion(json!([])))
             }
         }),
     );
@@ -249,7 +256,7 @@ async fn provider_timeout_falls_back_and_spam_skips_the_provider() {
 }
 
 fn spam_completion(is_spam: bool, confidence: f64) -> Value {
-    json!({"choices":[{"finish_reason":"stop","message":{"content":json!({"category":"CATEGORY_UPDATES","label_ids":[],"spam":{"is_spam":is_spam,"confidence":confidence}}).to_string()}}]})
+    json!({"choices":[{"finish_reason":"stop","message":{"content":json!({"label_ids":[],"spam":{"is_spam":is_spam,"confidence":confidence}}).to_string()}}]})
 }
 
 #[tokio::test]
@@ -344,7 +351,7 @@ async fn malformed_spam_verdicts_cannot_partially_change_mail() {
                 .await
                 .unwrap();
         assert!(labels.iter().any(|l| l == "INBOX"));
-        assert!(labels.iter().any(|l| l == "CATEGORY_PERSONAL"));
+        assert!(!labels.iter().any(|l| l.starts_with("CATEGORY_")));
         assert!(!labels.iter().any(|l| l == "SPAM"));
         task.abort();
     }

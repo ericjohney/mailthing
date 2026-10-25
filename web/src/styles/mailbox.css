@@ -66,14 +66,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.category-tabs {
-  padding: 0 var(--space-7);
-  min-height: 62px;
-}
-.category-tabs .tab {
-  flex: 1;
-  padding: 0 var(--space-3);
-}
+
 .message-list {
   overflow: auto;
   flex: 1;

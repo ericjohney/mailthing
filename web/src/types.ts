@@ -6,7 +6,7 @@ export interface Label {
   id: string;
   name: string;
   color: string;
-  /** System labels (INBOX, STARRED, CATEGORY_SOCIAL, ...) are built in. */
+  /** System labels (INBOX, STARRED, SPAM, ...) are built in. */
   kind: 'system' | 'user';
 }
 export interface Settings {

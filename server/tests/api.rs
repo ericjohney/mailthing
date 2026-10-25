@@ -589,8 +589,8 @@ async fn imports_keep_original_time_mailbox_state_and_labels() {
         .unwrap();
     assert_ne!(old.0, current);
     assert_eq!(old.1, original);
-    // Archived and read; the heuristic category is kept.
-    assert_eq!(old.2, "Primary,Receipts,Starred,Travel");
+    // Archived and read; custom labels are kept.
+    assert_eq!(old.2, "Receipts,Starred,Travel");
     let (_, labels) = request(&app, "GET", "/api/labels", json!(null)).await;
     let user: Vec<&str> = labels
         .as_array()
@@ -729,26 +729,25 @@ async fn sorting_memory_tracks_only_explicit_corrections_and_can_be_cleared() {
         .find(|m| m["label_id"] == id)
         .unwrap();
     assert_eq!(memory["examples"][0]["included"], false);
-    request(
-        &app,
-        "POST",
-        "/api/actions",
-        json!({"thread_ids":[thread_ids[13]],"action":"category","value":"CATEGORY_SOCIAL"}),
-    )
-    .await;
+    assert_eq!(
+        request(
+            &app,
+            "POST",
+            "/api/actions",
+            json!({"thread_ids":[thread_ids[13]],"action":"category","value":"CATEGORY_SOCIAL"}),
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
     let (_, memories) = request(&app, "GET", "/api/sorting/memories", json!(null)).await;
-    for category in mailthing::labels::CATEGORIES {
-        let memory = memories
+    assert!(
+        memories
             .as_array()
             .unwrap()
             .iter()
-            .find(|m| m["label_id"] == category)
-            .unwrap();
-        assert_eq!(
-            memory["examples"][0]["included"],
-            category == "CATEGORY_SOCIAL"
-        );
-    }
+            .all(|m| !m["label_id"].as_str().unwrap().starts_with("CATEGORY_"))
+    );
     request(
         &app,
         "PUT",
@@ -901,4 +900,216 @@ async fn regenerates_legacy_previews_without_changing_saved_messages_or_mailbox_
         .await
         .unwrap();
     assert_eq!(stored, "Old broken preview");
+}
+
+#[tokio::test]
+async fn tag_selection_is_atomic_preserves_system_state_and_teaches_only_custom_tags() {
+    let (_temp, state) = setup().await;
+    let thread = deliver(&state, mail("Tagged", "tag-picker", "A saved conversation")).await;
+    let app = api::router(state.clone());
+    let (_, a) = request(
+        &app,
+        "POST",
+        "/api/labels",
+        json!({"name":"Travel","color":"#808080"}),
+    )
+    .await;
+    let (_, b) = request(
+        &app,
+        "POST",
+        "/api/labels",
+        json!({"name":"Receipts","color":"#808080"}),
+    )
+    .await;
+    let selected =
+        json!({"thread_ids":[thread],"action":"set_labels","label_ids":[a["id"],b["id"],a["id"]]});
+    assert_eq!(
+        request(&app, "POST", "/api/actions", selected).await.0,
+        StatusCode::OK
+    );
+    let (_, conversation) =
+        request(&app, "GET", &format!("/api/threads/{thread}"), json!(null)).await;
+    let ids: Vec<_> = conversation["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["id"].clone())
+        .collect();
+    for id in [
+        json!("INBOX"),
+        json!("UNREAD"),
+        a["id"].clone(),
+        b["id"].clone(),
+    ] {
+        assert!(ids.contains(&id));
+    }
+    let change = json!({"thread_ids":[thread],"action":"set_labels","label_ids":[b["id"]]});
+    assert_eq!(
+        request(&app, "POST", "/api/actions", change).await.0,
+        StatusCode::OK
+    );
+    for invalid in [json!(["INBOX"]), json!([b["id"], "does-not-exist"])] {
+        assert_eq!(
+            request(
+                &app,
+                "POST",
+                "/api/actions",
+                json!({"thread_ids":[thread],"action":"set_labels","label_ids":invalid})
+            )
+            .await
+            .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    assert_eq!(
+        request(
+            &app,
+            "POST",
+            "/api/actions",
+            json!({"thread_ids":[thread],"action":"set_labels"})
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    let (_, conversation) =
+        request(&app, "GET", &format!("/api/threads/{thread}"), json!(null)).await;
+    let tags: Vec<_> = conversation["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|l| l["kind"] == "user")
+        .map(|l| l["id"].clone())
+        .collect();
+    assert_eq!(
+        tags,
+        vec![b["id"].clone()],
+        "Failed updates must not partially clear tags"
+    );
+    let included: bool =
+        sqlx::query_scalar("SELECT included FROM sorting_examples WHERE label_id=?")
+            .bind(a["id"].as_str().unwrap())
+            .fetch_one(&state.pool)
+            .await
+            .unwrap();
+    assert!(!included, "Removing a tag is a negative sorting example");
+    assert_eq!(
+        request(
+            &app,
+            "POST",
+            "/api/actions",
+            json!({"thread_ids":[thread],"action":"set_labels","label_ids":[]})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let (_, conversation) =
+        request(&app, "GET", &format!("/api/threads/{thread}"), json!(null)).await;
+    assert!(
+        conversation["labels"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|l| l["kind"] != "user")
+    );
+    assert!(
+        conversation["messages"][0]["labels"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("INBOX"))
+    );
+}
+
+#[tokio::test]
+async fn autofill_inputs_are_recent_bounded_read_only_and_exclude_hidden_or_imported_mail() {
+    let (_temp, state) = setup().await;
+    let current = deliver(
+        &state,
+        mail(
+            "Your verification code",
+            "code-current",
+            "Your verification code is 123456",
+        ),
+    )
+    .await;
+    let hidden = deliver(
+        &state,
+        mail("Your login code", "code-spam", "Your login code is 234567"),
+    )
+    .await;
+    let old = deliver(
+        &state,
+        mail("Your passcode", "code-old", "Your passcode is 345678"),
+    )
+    .await;
+    sqlx::query("UPDATE messages SET received_at=? WHERE thread_id=?")
+        .bind(mailthing::db::now() - 601_000)
+        .bind(&old)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO message_labels(message_id,label_id) SELECT id,'SPAM' FROM messages WHERE thread_id=?")
+        .bind(&hidden)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    db::enqueue_import(
+        &state.pool,
+        mail(
+            "Imported code",
+            "imported-code",
+            "Your verification code is 456789",
+        ),
+        &envelope(),
+        Some(&mailthing::models::ImportState::default()),
+    )
+    .await
+    .unwrap();
+    mailthing::pipeline::process_next(&state.pool, state.pipeline.clone())
+        .await
+        .unwrap();
+    let app = api::router(state.clone());
+    let (status, response) = request(&app, "GET", "/api/autofill/messages", json!(null)).await;
+    assert_eq!(status, StatusCode::OK);
+    let messages = response["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 1);
+    let message_id: String = sqlx::query_scalar("SELECT id FROM messages WHERE thread_id=?")
+        .bind(&current)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    assert_eq!(messages[0]["id"], message_id);
+    assert_eq!(
+        messages[0]["text"].as_str().unwrap().trim(),
+        "Your verification code is 123456"
+    );
+    assert!(messages[0].get("raw").is_none());
+    let unread: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM message_labels WHERE message_id IN(SELECT id FROM messages WHERE thread_id=?) AND label_id='UNREAD'",
+    )
+    .bind(&current)
+    .fetch_one(&state.pool)
+    .await
+    .unwrap();
+    assert_eq!(unread, 1);
+    for n in 0..42 {
+        deliver(
+            &state,
+            mail(
+                "Your verification code",
+                &format!("code-bounded-{n}"),
+                &"x".repeat(13000),
+            ),
+        )
+        .await;
+    }
+    let (_, response) = request(&app, "GET", "/api/autofill/messages", json!(null)).await;
+    let messages = response["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 40);
+    assert!(
+        messages
+            .iter()
+            .all(|m| m["text"].as_str().unwrap().chars().count() <= 12000)
+    );
 }

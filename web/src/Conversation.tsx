@@ -20,7 +20,7 @@ import {
 import { encodeFile, messageDate } from './api';
 import { EmailContent } from './mailbox/EmailContent';
 import { AttachmentCard, AttachmentPreview } from './mailbox/AttachmentPreview';
-import { categories, placeLabels } from './mailbox/navigation';
+import { placeLabels } from './mailbox/navigation';
 import {
   emptyDraft,
   type Attachment,
@@ -137,18 +137,6 @@ export function Conversation({
           </IconButton>
           {labelMenu && (
             <div className="dropdown">
-              <span className="dropdown-heading">Move to category</span>
-              {categories.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    action('category', item.id);
-                    setLabelMenu(false);
-                  }}
-                >
-                  {item.name}
-                </button>
-              ))}
               <span className="dropdown-heading">Conversation labels</span>
               {labels.length === 0 && (
                 <span className="dropdown-heading">Create labels in Settings</span>

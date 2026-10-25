@@ -17,6 +17,9 @@ struct SettingsView: View {
                     }
                     NavigationLink { SortingMemoryView() } label: { Label("Sorting memory", systemImage: "doc.text").foregroundStyle(.primary) }
                 }
+                Section {
+                    NavigationLink { CodeAutoFillSettingsView() } label: { Label("Verification-code AutoFill", systemImage: "key").foregroundStyle(.primary) }
+                }
                 Section("Appearance") {
                     Picker("Theme", selection: $appearance) {
                         Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark")
@@ -103,7 +106,7 @@ private struct MailSortingSettingsView: View {
                 }
                 NavigationLink { SortingMemoryView() } label: { Label("Sorting memory", systemImage: "tag") }
             } footer: {
-                Text("Edit category, label and Spam guidance. Your label and Spam / Not spam corrections teach future sorting. Uncertain mail stays in the inbox; nothing is automatically deleted.")
+                Text("Edit tag and Spam guidance. Your label and Spam / Not spam corrections teach future sorting. Uncertain mail stays in the inbox; nothing is automatically deleted.")
             }
         }.navigationTitle("Mail sorting").navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
@@ -128,7 +131,6 @@ struct SortingMemoryView: View {
                     Button("Retry") { Task { await load() } }.disabled(loading)
                 }
             }
-            memorySection("Inbox categories", items: memories.filter { $0.kind == "system" && !$0.isSpam })
             memorySection("Labels", items: memories.filter { $0.kind == "user" })
             memorySection("Spam detection", items: memories.filter(\.isSpam))
             if loaded && memories.filter({ $0.kind == "user" }).isEmpty {
@@ -224,7 +226,7 @@ struct SortingMemoryEditor: View {
             } header: { Text("Sorting guidance") } footer: {
                 Text(memory.isSpam
                     ? "Describe unwanted mail. Promotions and newsletters are legitimate unless your guidance or corrections say otherwise."
-                    : "Describe the mail that belongs in this category or label. Your filters still take precedence.")
+                    : "Describe the mail that belongs in this tag. Your filters still take precedence.")
             }
             if let error { Section { Text(error).foregroundStyle(.red) } }
             if let notice { Section { Text(notice).foregroundStyle(.secondary) }.accessibilityAddTraits(.updatesFrequently) }
@@ -237,7 +239,7 @@ struct SortingMemoryEditor: View {
             } header: { Text("Correction memory") } footer: {
                 Text(memory.isSpam
                     ? "Spam and Not spam corrections are remembered separately. Clearing examples preserves your guidance."
-                    : "Applying or removing labels and moving conversations between categories teaches future sorting. Clearing examples preserves your guidance.")
+                    : "Applying or removing tags teaches future sorting. Clearing examples preserves your guidance.")
             }
             if !memory.examples.isEmpty {
                 Section(memory.isSpam ? "Recent Spam / Not spam examples" : "Recent examples") {

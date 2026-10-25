@@ -5,7 +5,7 @@ on:
       version:
         description: Marketing version
         type: string
-        default: '1.0.4'
+        default: '1.0.5'
         required: true
 permissions:
   contents: read
@@ -35,9 +35,10 @@ jobs:
           IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
           IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_AUTOFILL_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_AUTOFILL_PROVISIONING_PROFILE_BASE64 }}
         run: |
           set -euo pipefail
-          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY IOS_DISTRIBUTION_CERTIFICATE_BASE64 IOS_DISTRIBUTION_CERTIFICATE_PASSWORD IOS_PROVISIONING_PROFILE_BASE64; do
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY IOS_DISTRIBUTION_CERTIFICATE_BASE64 IOS_DISTRIBUTION_CERTIFICATE_PASSWORD IOS_PROVISIONING_PROFILE_BASE64 IOS_AUTOFILL_PROVISIONING_PROFILE_BASE64; do
             [[ -n "${!name}" ]] || { echo "Missing required secret: $name" >&2; exit 1; }
           done
           signing="$RUNNER_TEMP/mailthing-signing"
@@ -45,6 +46,7 @@ jobs:
           printf '%s' "$IOS_DISTRIBUTION_CERTIFICATE_BASE64" | base64 -D > "$signing/distribution.p12"
           printf '%s' "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" > "$signing/p12-password.txt"
           printf '%s' "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -D > "$signing/Mailthing_AppStore.mobileprovision"
+          printf '%s' "$IOS_AUTOFILL_PROVISIONING_PROFILE_BASE64" | base64 -D > "$signing/Mailthing_AutoFill_AppStore.mobileprovision"
           printf '%s' "$ASC_PRIVATE_KEY" > "$signing/AuthKey_$ASC_KEY_ID.p8"
           chmod 600 "$signing"/*
           echo "SIGNING_DIRECTORY=$signing" >> "$GITHUB_ENV"

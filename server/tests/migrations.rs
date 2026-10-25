@@ -66,25 +66,13 @@ async fn folder_columns_become_labels() {
 
     assert_eq!(
         labels_of(&pool, "new").await,
-        ["CATEGORY_PROMOTIONS", "INBOX", "STARRED", "UNREAD", "a"]
+        ["INBOX", "STARRED", "UNREAD", "a"]
     );
-    assert_eq!(
-        labels_of(&pool, "archived").await,
-        ["CATEGORY_PERSONAL", "IMPORTANT", "b"]
-    );
+    assert_eq!(labels_of(&pool, "archived").await, ["IMPORTANT", "b"]);
     assert_eq!(labels_of(&pool, "sent").await, ["SENT", "c"]);
-    assert_eq!(
-        labels_of(&pool, "snoozed").await,
-        ["CATEGORY_UPDATES", "SNOOZED"]
-    );
-    assert_eq!(
-        labels_of(&pool, "woken").await,
-        ["CATEGORY_SOCIAL", "INBOX"]
-    );
-    assert_eq!(
-        labels_of(&pool, "trashed").await,
-        ["CATEGORY_PERSONAL", "TRASH", "UNREAD"]
-    );
+    assert_eq!(labels_of(&pool, "snoozed").await, ["SNOOZED"]);
+    assert_eq!(labels_of(&pool, "woken").await, ["INBOX"]);
+    assert_eq!(labels_of(&pool, "trashed").await, ["TRASH", "UNREAD"]);
     let users: Vec<(String, String)> =
         sqlx::query_as("SELECT id,name FROM labels WHERE kind='user' ORDER BY id")
             .fetch_all(&pool)
@@ -98,11 +86,21 @@ async fn folder_columns_become_labels() {
             ("c".into(), "Inbox (c)".into())
         ]
     );
-    let rule: String = sqlx::query_scalar("SELECT value FROM rules")
+    let retired: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM labels WHERE id LIKE 'CATEGORY_%'")
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(rule, "CATEGORY_SOCIAL");
+    assert_eq!(retired, 0);
+    let rules: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM rules WHERE action='category'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rules, 0);
+    let messages: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(messages, 6);
     let violations = sqlx::query("PRAGMA foreign_key_check")
         .fetch_all(&pool)
         .await

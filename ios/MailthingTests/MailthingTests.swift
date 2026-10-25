@@ -3,6 +3,120 @@ import WebKit
 @testable import Mailthing
 
 final class MailthingTests: XCTestCase {
+    private let codeNow = Date(timeIntervalSince1970: 1_800_000_000)
+    private func codeMail(_ text: String, subject: String = "Sign in", age: Double = 10, sender: String = "security@example.com") -> CodeMail {
+        CodeMail(id: "code-message", senderEmail: sender, subject: subject, text: text, receivedAt: codeNow.addingTimeInterval(-age).timeIntervalSince1970 * 1000)
+    }
+
+    func testVerificationCodeExtractionSupportsCommonFormatsAndUnicodeText() throws {
+        for text in ["Your verification code is 123456", "123456 is your sign-in code", "123456 is your Example verification code", "Hello 👋\nYour one-time password: 123456", "Security code\n123456"] {
+            let code = try XCTUnwrap(VerificationCode.extract(from: codeMail(text), now: codeNow), text)
+            XCTAssertEqual(code.code, "123456")
+            XCTAssertEqual(code.domain, "example.com")
+        }
+        XCTAssertEqual(VerificationCode.extract(from: codeMail("Your passcode: 0421"), now: codeNow)?.code, "0421")
+    }
+
+    func testVerificationCodeExtractionRejectsOrdinaryNumbersQuotesAndAmbiguity() {
+        for text in ["Order #123456 has shipped", "Call 415-555-1234", "Your verification code will arrive soon. Your order is 123456", "Your verification code: 123456789", "Your security code is 123456 and your verification code is 234567", "> Your verification code is 123456"] {
+            XCTAssertNil(VerificationCode.extract(from: codeMail(text), now: codeNow), text)
+        }
+        XCTAssertNil(VerificationCode.extract(from: codeMail("Your security code: 123456", subject: "Fwd: Login"), now: codeNow))
+        XCTAssertNil(VerificationCode.extract(from: codeMail("Your security code: 123456", sender: "bad-address"), now: codeNow))
+    }
+
+    func testVerificationCodesExpireAndRejectFutureReceiptTimes() {
+        XCTAssertNil(VerificationCode.extract(from: codeMail("Your security code: 123456", age: 601), now: codeNow))
+        XCTAssertNil(VerificationCode.extract(from: codeMail("Your security code: 123456", age: -1), now: codeNow))
+        XCTAssertNil(VerificationCode.extract(from: codeMail("Your security code: 123456. Expires in 1 minute", age: 61), now: codeNow))
+        XCTAssertNotNil(VerificationCode.extract(from: codeMail("Your security code: 123456. Valid for 30 seconds", age: 10), now: codeNow))
+    }
+
+    func testVerificationCodeDomainsDoNotMatchLookalikeServices() throws {
+        let code = try XCTUnwrap(VerificationCode.extract(from: codeMail("Your security code: 123456"), now: codeNow))
+        XCTAssertTrue(code.matches("https://login.example.com/session"))
+        XCTAssertTrue(code.matches("example.com"))
+        XCTAssertTrue(code.matches("https://LOGIN.EXAMPLE.COM"))
+        XCTAssertFalse(code.matches("example.com.attacker.net"))
+        XCTAssertFalse(code.matches("fake-example.com"))
+    }
+
+    func testCodeProviderRetainsBoundedDomainMetadataForTheNextCode() throws {
+        let code = try XCTUnwrap(VerificationCode.extract(from: codeMail("Your security code is 123456"), now: codeNow))
+        let old = codeNow.addingTimeInterval(-31 * 86400).timeIntervalSince1970
+        let previous = ["expired.example": old, "future.example": codeNow.addingTimeInterval(60).timeIntervalSince1970, "known.example": codeNow.addingTimeInterval(-86400).timeIntervalSince1970]
+        let domains = CodeMailbox.refreshedServices(previous, codes: [code], now: codeNow)
+        XCTAssertEqual(Set(domains.keys), ["known.example", "example.com"])
+        XCTAssertEqual(CodeMailbox.refreshedServices(domains, codes: [], now: codeNow), domains, "Retain domain identity for a subsequent code while the host is closed")
+        let many = Dictionary(uniqueKeysWithValues: (0..<120).map { ("domain\($0).example", codeNow.timeIntervalSince1970) })
+        XCTAssertEqual(CodeMailbox.refreshedServices(many, codes: [], now: codeNow).count, 100)
+    }
+
+    func testCodeProviderFetchUsesFreshMailSuppressesConsumedCodesAndRejectsServerErrors() async throws {
+        let server = URL(string: "http://127.0.0.1:19005")!
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CodeProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let previous = CodeMailbox.defaults?.dictionary(forKey: "usedCodes")
+        defer { CodeMailbox.defaults?.set(previous, forKey: "usedCodes") }
+        CodeMailbox.defaults?.removeObject(forKey: "usedCodes")
+        let now = Date()
+        func message(_ id: String, age: Double, code: String) -> [String: Any] {
+            ["id": id, "sender_email": "security@example.com", "subject": "Your verification code", "text": "Your verification code is \(code)", "received_at": now.addingTimeInterval(-age).timeIntervalSince1970 * 1000]
+        }
+        CodeProtocol.response = try JSONSerialization.data(withJSONObject: ["messages": [message("latest", age: 1, code: "123456"), message("older", age: 30, code: "234567")]])
+        CodeProtocol.status = 200
+        let codes = try await CodeMailbox.fetch(server: server, session: session, now: now)
+        XCTAssertEqual(codes.map(\.id), ["latest"])
+        XCTAssertEqual(CodeProtocol.path, "/api/autofill/messages")
+        CodeMailbox.consume(try XCTUnwrap(codes.first), server: server)
+        let afterUse = try await CodeMailbox.fetch(server: server, session: session, now: now)
+        XCTAssertTrue(afterUse.isEmpty, "An older code must not reappear after filling the latest code")
+        CodeProtocol.status = 503
+        do { _ = try await CodeMailbox.fetch(server: server, session: session, now: now); XCTFail("Server failure must not return cached codes") }
+        catch { XCTAssertTrue(error is CodeMailboxError) }
+    }
+
+    func testClearingOneConversationKeepsOtherDeliveredAlerts() {
+        let delivered: [(id: String, threadID: String?)] = [("a", "first"), ("b", "other"), ("c", "first"), ("d", nil)]
+        XCTAssertEqual(MailNotifications.identifiers(for: "first", in: delivered), ["a", "c"])
+        XCTAssertEqual(MailNotifications.identifiers(for: "missing", in: delivered), [])
+    }
+
+    func testTagUpdateWireFormatSupportsMultipleTagsAndRemovingAll() throws {
+        for tags in [["travel", "receipts"], []] {
+            let data = try JSONEncoder.mailthing.encode(TagUpdate(threadIds: ["thread"], labelIds: tags))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            XCTAssertEqual(json["thread_ids"] as? [String], ["thread"])
+            XCTAssertEqual(json["action"] as? String, "set_labels")
+            XCTAssertEqual(json["label_ids"] as? [String], tags)
+        }
+    }
+
+    func testSenderBadgesHandleNamesAddressesAndMissingSenders() {
+        XCTAssertEqual(SenderInitials.make(name: "Sam Rivera", email: "sam@example.net"), "SR")
+        XCTAssertEqual(SenderInitials.make(name: "  Élise van Dijk  ", email: ""), "ÉD")
+        XCTAssertEqual(SenderInitials.make(name: "李 小龍", email: ""), "李小")
+        XCTAssertEqual(SenderInitials.make(name: "Studio", email: "hello@example.net"), "S")
+        XCTAssertEqual(SenderInitials.make(name: "", email: "no-reply@example.net"), "NR")
+        XCTAssertEqual(SenderInitials.make(name: "sam.rivera@example.net", email: "sam.rivera@example.net"), "SR")
+        XCTAssertEqual(SenderInitials.make(name: "💌", email: ""), "?")
+        XCTAssertEqual(SenderInitials.make(name: "", email: ""), "?")
+    }
+
+    @MainActor
+    func testUnreadFilterCombinesWithSearchAndResetsOnMailboxChange() {
+        let store = MailStore()
+        store.search = "from:sam@example.net"
+        store.unreadOnly = true
+        XCTAssertEqual(store.effectiveSearch, "from:sam@example.net is:unread")
+        store.select("Travel")
+        XCTAssertEqual(store.effectiveSearch, "")
+        XCTAssertFalse(store.unreadOnly)
+        XCTAssertEqual(store.label, "Travel")
+    }
+
     func testAttachmentPreviewUsesMIMEAndFallsBackToGenericFileExtensions() {
         for (name, mime) in [("scan", "application/pdf"), ("photo", "image/png"), ("invoice.PDF", "application/octet-stream"), ("photo.JPG", "")] {
             let attachment = Attachment(id: "a", messageId: "m", name: name, contentType: mime, size: 1)
@@ -156,4 +270,20 @@ final class MailthingTests: XCTestCase {
         }
     }
 
+}
+
+private final class CodeProtocol: URLProtocol {
+    static var response = Data()
+    static var status = 200
+    static var path: String?
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.path = request.url?.path
+        let reply = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: nil, headerFields: nil)!
+        client?.urlProtocol(self, didReceive: reply, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.response)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }

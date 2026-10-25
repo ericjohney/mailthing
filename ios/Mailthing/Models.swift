@@ -96,3 +96,17 @@ extension JSONDecoder {
 extension JSONEncoder {
     static var mailthing: JSONEncoder { let value = JSONEncoder(); value.keyEncodingStrategy = .convertToSnakeCase; return value }
 }
+
+/// Stable, local initials. Sender badges never fetch third-party profile images.
+enum SenderInitials {
+    static func make(name: String, email: String) -> String {
+        let display = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = display.isEmpty || display.contains("@")
+            ? String(email.split(separator: "@").first ?? "") : display
+        let words = source.split { $0.isWhitespace || $0 == "." || $0 == "-" || $0 == "_" }
+            .map { $0.filter { $0.isLetter || $0.isNumber } }.filter { !$0.isEmpty }
+        guard let first = words.first?.first else { return "?" }
+        let last = words.count > 1 ? words.last?.first : nil
+        return (String(first) + (last.map(String.init) ?? "")).uppercased()
+    }
+}

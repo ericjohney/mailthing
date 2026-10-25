@@ -61,17 +61,7 @@
   .page-heading h1 {
     font-size: var(--font-size-xl);
   }
-  .category-tabs {
-    padding: 0 var(--space-4);
-  }
-  .category-tabs .tab {
-    gap: var(--space-2);
-    padding-left: var(--space-2);
-    padding-right: var(--space-2);
-  }
-  .category-tabs .tab svg {
-    width: 16px;
-  }
+
   .row-sender {
     width: 95px;
     min-width: 95px;
@@ -275,21 +265,7 @@
   .mail-toolbar.selection-active .pagination-control {
     display: none;
   }
-  .category-tabs {
-    min-height: 56px;
-    padding: 0 var(--space-2);
-  }
-  .category-tabs .tab {
-    justify-content: center;
-    padding: 0 6px;
-    gap: 0;
-  }
-  .category-tabs .tab > svg {
-    display: none;
-  }
-  .category-tabs .tab strong {
-    font-size: var(--font-size-xs);
-  }
+
   .message-row {
     min-height: var(--row-height);
     padding: 0 var(--space-3);

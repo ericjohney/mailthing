@@ -7,10 +7,11 @@ struct InboxView: View {
     @GestureState private var drawerDrag: CGFloat = 0
     @State private var showSettings = false
     @State private var compose: Draft?
+    @State private var tags: TagTarget?
     @State private var showSearch = false
     @FocusState private var searching: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
 
-    private let categories = [("CATEGORY_PERSONAL", "Primary", "tray"), ("CATEGORY_UPDATES", "Updates", "info.circle"), ("CATEGORY_SOCIAL", "Social", "person.2"), ("CATEGORY_PROMOTIONS", "Promotions", "tag")]
     private let mailboxes = [("INBOX", "Inbox", "tray"), ("UNREAD", "Unread", "envelope.badge"), ("STARRED", "Starred", "star"), ("SNOOZED", "Snoozed", "clock"), ("IMPORTANT", "Important", "chevron.right.2"), ("SENT", "Sent", "paperplane"), ("DRAFTS", "Drafts", "doc"), ("ALL", "All mail", "envelope"), ("SPAM", "Spam", "exclamationmark.octagon"), ("TRASH", "Trash", "trash")]
 
     var body: some View {
@@ -54,10 +55,12 @@ struct InboxView: View {
                 .simultaneousGesture(sidebar ? drawerGesture(panelWidth: panelWidth) : nil)
                 .accessibilityAction(.escape) { setSidebar(false) }
             }
+            .background(Color.mailCanvas.ignoresSafeArea())
             .navigationDestination(for: String.self) { ConversationView(id: $0) }
+            .sheet(item: $tags) { target in TagPicker(threadID: target.id) }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(item: $compose, onDismiss: { Task { await store.refresh() } }) { ComposeView(initial: $0) }
-            .task(id: "\(store.label)|\(store.category)|\(store.search)") {
+            .task(id: "\(store.label)|\(store.search)|\(store.unreadOnly)") {
                 do {
                     if !store.search.isEmpty { try await Task.sleep(for: .milliseconds(350)) }
                     try Task.checkCancellation()
@@ -82,7 +85,8 @@ struct InboxView: View {
                 threadList
             }
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.mailCanvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) { inboxDock }
         .toolbar(.hidden, for: .navigationBar)
     }
 
@@ -106,37 +110,41 @@ struct InboxView: View {
     }
 
     private var header: some View {
-        MailHeader {
-            Button { setSidebar(true) } label: {
-                MailMark().frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel("Open mailboxes")
-            Button { setSidebar(true) } label: {
-                HStack(spacing: 6) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(store.title).font(.headline).lineLimit(1)
-                        if store.label == "INBOX" && !store.category.isEmpty && store.search.isEmpty {
-                            Text(categories.first { $0.0 == store.category }?.1 ?? "Primary")
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                    if let unread = store.settings?.counts[store.label]?.unread, unread > 0 {
-                        Text("\(unread)").font(.caption).foregroundStyle(.secondary)
-                            .accessibilityLabel("\(unread) unread messages")
-                    }
+        let textLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 10))
+        return HStack(alignment: .center, spacing: 10) {
+            textLayout {
+                Button { setSidebar(true) } label: {
+                    HStack(spacing: 5) {
+                        Text(store.title).font(.title2.weight(.semibold)).lineLimit(1)
+                        Image(systemName: "chevron.down").font(.caption2).dynamicTypeSize(...DynamicTypeSize.xxxLarge).foregroundStyle(.secondary)
+                    }.frame(minHeight: 44).contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityLabel("Choose mailbox, \(store.title)")
+                if let unread = store.settings?.counts[store.label]?.unread, unread > 0 {
+                    Text("\(unread) unread").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }.buttonStyle(.plain).foregroundStyle(.primary)
-                .accessibilityLabel("Choose mailbox, \(store.title)")
+            }.layoutPriority(1)
             Spacer(minLength: 0)
             if store.loading { ProgressView().controlSize(.mini).accessibilityLabel("Refreshing mailbox") }
-            MailIconButton(symbol: "magnifyingglass", label: "Search mail") {
-                showSearch = true
-                searching = true
+            if store.label != "DRAFTS" {
+                MailIconButton(symbol: store.unreadOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease", label: store.unreadOnly ? "Show all messages" : "Filter unread messages") {
+                    store.unreadOnly.toggle()
+                }.accessibilityValue(store.unreadOnly ? "Unread only" : "All messages")
             }
+        }
+        .padding(.leading, 28).padding(.trailing, 12).frame(minHeight: 54)
+        .background(Color.mailCanvas)
+    }
+
+    private var inboxDock: some View {
+        MailDock {
+            MailIconButton(symbol: "line.3.horizontal", label: "Open mailboxes") { setSidebar(true) }
+            Spacer()
+            MailIconButton(symbol: "magnifyingglass", label: "Search mail") {
+                showSearch = true; searching = true
+            }
+            Spacer()
             MailIconButton(symbol: "square.and.pencil", label: "Compose", emphasized: true) {
-                searching = false
-                compose = Draft()
+                searching = false; compose = Draft()
             }
         }
     }
@@ -166,18 +174,25 @@ struct InboxView: View {
         List {
             ForEach(store.threads) { thread in
                 HStack(alignment: .top, spacing: 4) {
-                    Button { searching = false; store.path.append(thread.id) } label: { ThreadRow(thread: thread) }
+                    Button { searching = false; store.path.append(thread.id) } label: { ThreadRow(thread: thread, labels: store.settings?.labels.filter { $0.kind == "user" && thread.labelIds.contains($0.id) } ?? []) }
                         .buttonStyle(.plain)
-                    if thread.starred {
-                        MailIconButton(symbol: "star.fill", label: "Unstar \(thread.subject)") {
-                            Task { await store.action(thread.id, "unstar") }
+                    VStack(spacing: 2) {
+                        MailIconButton(symbol: "tag", label: "Edit tags for \(thread.subject)") { tags = TagTarget(id: thread.id) }
+                        if thread.starred {
+                            MailIconButton(symbol: "star.fill", label: "Unstar \(thread.subject)") {
+                                Task { await store.action(thread.id, "unstar") }
+                            }
                         }
                     }
                 }
-                .listRowInsets(EdgeInsets(top: 12, leading: 8, bottom: 12, trailing: 20))
-                .listRowSeparatorTint(Color.primary.opacity(0.08))
+                .padding(14)
+                .background(thread.unread > 0 ? Color.mailSurface : Color.mailCanvas, in: RoundedRectangle(cornerRadius: 16))
+                .listRowBackground(Color.mailCanvas)
+                .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+                .listRowSeparator(.hidden)
                 .alignmentGuide(.listRowSeparatorLeading) { dimensions in dimensions[.leading] + 12 }
                 .contextMenu {
+                    Button("Tags", systemImage: "tag") { tags = TagTarget(id: thread.id) }
                     Button(thread.starred ? "Unstar" : "Star", systemImage: thread.starred ? "star.slash" : "star") {
                         Task { await store.action(thread.id, thread.starred ? "unstar" : "star") }
                     }
@@ -203,7 +218,8 @@ struct InboxView: View {
                     .frame(maxWidth: .infinity).padding()
             }
         }
-        .listStyle(.plain).contentMargins(.top, 0, for: .scrollContent)
+        .listStyle(.plain).scrollContentBackground(.hidden).background(Color.mailCanvas)
+        .contentMargins(.top, 0, for: .scrollContent)
         .refreshable { await store.refresh() }
         .overlay { if store.threads.isEmpty && !store.loading && store.error == nil { emptyState } }
     }
@@ -225,7 +241,8 @@ struct InboxView: View {
                 .swipeActions { Button("Delete", role: .destructive) { Task { await deleteDraft(draft) } } }
             }
         }
-        .listStyle(.plain).contentMargins(.top, 0, for: .scrollContent)
+        .listStyle(.plain).scrollContentBackground(.hidden).background(Color.mailCanvas)
+        .contentMargins(.top, 0, for: .scrollContent)
         .refreshable { await store.refresh() }
         .overlay { if store.drafts.isEmpty && !store.loading && store.error == nil { emptyState } }
     }
@@ -272,10 +289,6 @@ struct InboxView: View {
                     }.foregroundStyle(.primary)
                         .listRowBackground(store.label == id ? Color.mailTint : Color(uiColor: .systemBackground))
                 }
-                Section("Inbox categories") {
-                    categoryRow(id: "", name: "All categories", icon: "tray.full")
-                    ForEach(categories, id: \.0) { id, name, icon in categoryRow(id: id, name: name, icon: icon) }
-                }
                 if let labels = store.settings?.labels.filter({ $0.kind == "user" }), !labels.isEmpty {
                     Section("Labels") {
                         ForEach(labels) { label in
@@ -289,19 +302,6 @@ struct InboxView: View {
             .listStyle(.plain).contentMargins(.top, 0, for: .scrollContent)
         }
         .background(Color(uiColor: .systemBackground))
-    }
-
-    private func categoryRow(id: String, name: String, icon: String) -> some View {
-        Button {
-            store.category = id
-            selectMailbox("INBOX")
-        } label: {
-            HStack {
-                Label(name, systemImage: icon)
-                Spacer()
-                if store.label == "INBOX" && store.category == id { Image(systemName: "checkmark").font(.caption) }
-            }
-        }.foregroundStyle(.primary)
     }
 
     private func selectMailbox(_ id: String) {
@@ -318,24 +318,36 @@ struct InboxView: View {
 }
 
 struct ThreadRow: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     var thread: MailThread
+    var labels: [MailLabel] = []
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Circle().fill(thread.unread > 0 ? Color.mailAction : .clear)
-                .frame(width: 5, height: 5).padding(.top, 7).frame(width: 6)
-                .accessibilityHidden(true)
+        HStack(alignment: .top, spacing: 10) {
+            if !typeSize.isAccessibilitySize { SenderAvatar(name: thread.sender, email: thread.senderEmail, unread: thread.unread > 0) }
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if typeSize.isAccessibilitySize {
+                    HStack(alignment: .center) {
+                        SenderAvatar(name: thread.sender, email: thread.senderEmail, unread: thread.unread > 0)
+                        Spacer(minLength: 4)
+                        Text(thread.date, format: .dateTime.month(.abbreviated).day()).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
                     Text(thread.sender.isEmpty ? thread.senderEmail : thread.sender)
-                        .font(.subheadline.weight(thread.unread > 0 ? .semibold : .regular)).lineLimit(1)
-                    if thread.count > 1 { Text("\(thread.count)").font(.caption).foregroundStyle(.secondary) }
-                    Spacer(minLength: 0)
-                    Text(thread.date, format: thread.date.isToday ? .dateTime.hour().minute() : .dateTime.month(.abbreviated).day())
-                        .font(.caption2).foregroundStyle(.secondary)
+                        .font(.subheadline.weight(thread.unread > 0 ? .semibold : .regular)).lineLimit(3)
+                    if thread.count > 1 { Text("\(thread.count) messages").font(.caption2).foregroundStyle(.secondary) }
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(thread.sender.isEmpty ? thread.senderEmail : thread.sender)
+                            .font(.subheadline.weight(thread.unread > 0 ? .semibold : .regular)).lineLimit(1)
+                        if thread.count > 1 { Text("\(thread.count)").font(.caption).foregroundStyle(.secondary) }
+                        Spacer(minLength: 0)
+                        Text(thread.date, format: thread.date.isToday ? .dateTime.hour().minute() : .dateTime.month(.abbreviated).day())
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
                 }
                 Text(thread.subject.isEmpty ? "(no subject)" : thread.subject)
-                    .font(.subheadline.weight(thread.unread > 0 ? .medium : .regular)).lineLimit(1)
-                Text(thread.snippet).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                    .font(.subheadline.weight(thread.unread > 0 ? .medium : .regular)).lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+                Text(thread.snippet).font(.subheadline).foregroundStyle(.secondary).lineLimit(typeSize.isAccessibilitySize ? 3 : 2)
+                if !labels.isEmpty { TagChips(labels: labels) }
                 if thread.hasAttachment { Label("Attachment", systemImage: "paperclip").font(.caption2).foregroundStyle(.secondary).padding(.top, 2) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

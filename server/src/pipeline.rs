@@ -43,17 +43,6 @@ impl ProcessedMail {
     pub fn has_label(&self, label: &str) -> bool {
         self.labels.iter().any(|l| l == label)
     }
-    pub fn category(&self) -> Option<&str> {
-        self.labels
-            .iter()
-            .map(String::as_str)
-            .find(|l| labels::CATEGORIES.contains(l))
-    }
-    pub fn set_category(&mut self, category: &str) {
-        self.labels
-            .retain(|l| !labels::CATEGORIES.contains(&l.as_str()));
-        self.add_label(category);
-    }
 }
 
 #[derive(Debug)]
@@ -85,7 +74,7 @@ impl Default for Pipeline {
             stages: vec![
                 Arc::new(ParseStage),
                 Arc::new(SanitizeStage),
-                Arc::new(CategorizeStage),
+                Arc::new(SpamHeaderStage),
                 Arc::new(RulesStage),
             ],
         }
@@ -241,55 +230,17 @@ impl Stage for SanitizeStage {
     }
 }
 
-pub struct CategorizeStage;
-impl Stage for CategorizeStage {
+pub struct SpamHeaderStage;
+impl Stage for SpamHeaderStage {
     fn name(&self) -> &'static str {
-        "Categorize"
+        "Check spam header"
     }
     fn run(&self, context: &mut PipelineContext<'_>) -> Result<()> {
         let mail = &mut context.mail;
-        let subject = mail.subject.to_lowercase();
-        let sender = mail.sender_email.to_lowercase();
-        let header = |name: &str| {
-            mail.headers
-                .iter()
-                .find(|(key, _)| key == name)
-                .map(|(_, value)| value.to_lowercase())
-                .unwrap_or_default()
-        };
-        let category = if ["facebook", "linkedin", "instagram", "twitter", "discord"]
+        let spam = mail
+            .headers
             .iter()
-            .any(|s| sender.contains(s))
-        {
-            labels::CATEGORY_SOCIAL
-        } else if !header("list-unsubscribe").is_empty()
-            || !header("list-id").is_empty()
-            || ["newsletter", "sale", "discount", "offer"]
-                .iter()
-                .any(|s| subject.contains(s))
-        {
-            labels::CATEGORY_PROMOTIONS
-        } else if [
-            "receipt",
-            "invoice",
-            "order",
-            "shipping",
-            "delivered",
-            "security",
-            "verification",
-            "notification",
-        ]
-        .iter()
-        .any(|s| subject.contains(s))
-            || sender.starts_with("no-reply")
-            || sender.starts_with("noreply")
-        {
-            labels::CATEGORY_UPDATES
-        } else {
-            labels::CATEGORY_PERSONAL
-        };
-        let spam = header("x-spam-flag").trim() == "yes";
-        mail.set_category(category);
+            .any(|(name, value)| name == "x-spam-flag" && value.trim().eq_ignore_ascii_case("yes"));
         if spam {
             mail.remove_label(labels::INBOX);
             mail.add_label(labels::SPAM);
@@ -322,9 +273,6 @@ impl Stage for RulesStage {
             let mail = &mut context.mail;
             match rule.action.as_str() {
                 "label" => mail.add_label(&rule.value),
-                "category" if labels::CATEGORIES.contains(&rule.value.as_str()) => {
-                    mail.set_category(&rule.value)
-                }
                 "archive" => mail.remove_label(labels::INBOX),
                 "spam" => {
                     mail.remove_label(labels::INBOX);
@@ -345,7 +293,7 @@ impl Stage for RulesStage {
 }
 
 /// Imported state overrides the pipeline's defaults and filters, as the source mailbox
-/// already reflects the owner's decisions. Filter labels and the category are kept.
+/// already reflects the owner's decisions. Custom filter labels are kept.
 pub fn apply_import_state(mail: &mut ProcessedMail, state: &ImportState) {
     if let Some(system) = &state.system_labels {
         for label in labels::STATE {
@@ -409,7 +357,7 @@ pub async fn persist(
     }
     if let Some(result) = &mail.sorting {
         sqlx::query("INSERT OR REPLACE INTO sorting_results(message_id,model,category,label_ids,classified_at,spam,spam_confidence,spam_moved) VALUES(?,?,?,?,?,?,?,?)")
-            .bind(id).bind(&result.model).bind(&result.decision.category)
+            .bind(id).bind(&result.model).bind("")
             .bind(serde_json::to_string(&result.decision.label_ids)?).bind(db::now())
             .bind(result.decision.spam.is_spam).bind(result.decision.spam.confidence).bind(result.spam_moved)
             .execute(&mut *tx).await?;

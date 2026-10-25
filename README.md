@@ -35,7 +35,7 @@ To add an optional collection of fictional example messages to a local instance,
 ## Mailbox features
 
 - Threaded conversations; HTML, plain-text, original source, PDF/image attachment previews, and downloads.
-- Inbox categories: Primary, Promotions, Social, and Updates.
+- One inbox, with custom tags for organizing mail.
 - Gmail-style labels instead of folders: a conversation can carry any number of labels, and archiving simply removes Inbox.
 - Stars, importance, read/unread, archive, snooze, Spam, Trash, and permanent deletion from Trash.
 - Custom labels and ordered filters configured in Settings.
@@ -49,7 +49,7 @@ Search examples:
 ```text
 from:sam@example.net subject:"weekend plans"
 is:unread has:attachment
-label:receipts category:updates
+label:receipts
 after:2026-01-01 before:2026-02-01
 coffee in:anywhere
 ```
@@ -146,7 +146,7 @@ System labels can't be renamed, deleted, or shadowed by a user label with the sa
 }
 ```
 
-`received_at` is the original receipt time in Unix milliseconds; it orders and threads the message instead of the import time. `system_labels` replaces the state labels new mail would get, and may contain `INBOX`, `SENT`, `SPAM`, `TRASH`, `UNREAD`, `STARRED`, and `IMPORTANT`; an empty list imports the message archived and read. `labels` are your own label names, matched case-insensitively and created when missing. Filter labels and the inbox category still apply; omitted fields behave like newly received mail. Import does not detect duplicates, so an importer must track what it has already sent.
+`received_at` is the original receipt time in Unix milliseconds; it orders and threads the message instead of the import time. `system_labels` replaces the state labels new mail would get, and may contain `INBOX`, `SENT`, `SPAM`, `TRASH`, `UNREAD`, `STARRED`, and `IMPORTANT`; an empty list imports the message archived and read. `labels` are your own label names, matched case-insensitively and created when missing. Custom filter labels still apply; omitted fields behave like newly received mail. Import does not detect duplicates, so an importer must track what it has already sent.
 
 `scripts/import-gmail.py` copies mail matching a Gmail search over IMAP, using an app password from `GMAIL_APP_PASSWORD` (prompted if unset). It keeps Gmail's receipt time, labels, and Inbox/read/starred/important/sent state, never modifies Gmail, skips drafts and oversized messages, and records imported Gmail ids under `~/.local/state/mailthing-import/` so re-runs resume without duplicates. Run it with `--dry-run` first to see the count and size:
 
@@ -154,7 +154,7 @@ System labels can't be renamed, deleted, or shadowed by a user label with the sa
 python3 scripts/import-gmail.py --user you@gmail.com --query 'newer_than:2m' --url http://127.0.0.1:9005 --dry-run
 ```
 
-Gmail's inbox tabs are not exposed over IMAP, so Mailthing assigns its own categories.
+Gmail's inbox tabs are not imported; Mailthing uses a single inbox and custom tags.
 
 ## LLM sorting and tag memory
 
@@ -170,13 +170,13 @@ LLM_SPAM_THRESHOLD=0.95
 
 `LLM_MODEL` is the exact alias advertised by your proxy; it is never hardcoded in the sorter. Keep the key in your deployment's secret store. Leaving all three connection variables unset disables LLM sorting; incomplete configuration fails startup. The timeout is configurable from 1–120 seconds.
 
-The classifier chooses one inbox category and may add your custom labels. **Settings → Sorting memory** stores editable guidance for each category and label. New custom labels become eligible for automatic sorting after you add guidance or explicitly apply them to a conversation. Applying/removing labels and moving conversations to a category remembers positive/negative examples. Each label retains at most 12 message examples; the four most recent are supplied to the model. You can inspect recent examples or clear all examples for a label in Settings. Deleting a message or label also deletes its associated examples. Model predictions, imports, and automatic filters never teach the memory; only your explicit corrections do. Guidance is not automatically rewritten by the model.
+The classifier may add your custom tags. **Settings → Sorting memory** stores editable guidance for each tag. New custom labels become eligible for automatic sorting after you add guidance or explicitly apply them to a conversation. Applying/removing tags remembers positive/negative examples. Each label retains at most 12 message examples; the four most recent are supplied to the model. You can inspect recent examples or clear all examples for a label in Settings. Deleting a message or label also deletes its associated examples. Model predictions, imports, and automatic filters never teach the memory; only your explicit corrections do. Guidance is not automatically rewritten by the model.
 
 The same request returns an independent spam verdict with model-reported confidence. Mail moves to **Spam** only when the model says it is spam and confidence meets `LLM_SPAM_THRESHOLD` (default 0.95; configurable from 0.5–1.0). These scores are model estimates, not calibrated probabilities. Uncertain mail stays in the inbox, and ordinary promotions/newsletters are legitimate unless your guidance or corrections say otherwise. Nothing is automatically deleted. Provider failures or invalid verdicts retain existing heuristic state.
 
 **Mark as spam** and **Not spam** update the separate Spam memory in Settings. Moving existing spam back to the inbox also records a not-spam correction, including from iOS. Moving ordinary archived mail to the inbox does not teach spam detection. Spam memory retains up to 12 spam and 12 not-spam examples, and supplies the two most recent of each to the model so both kinds of corrections remain represented. Automatic decisions, spam headers, imports and filters never teach this memory. A **Never mark as spam** filter removes Spam and restores Inbox after classification; filters run in order, so later matching rules still win. Existing historical Spam decisions are not automatically retrained or revisited.
 
-Requests include sender, subject, selected mailing-list headers, and at most 6,000 characters of plain-text body, plus label guidance and bounded example excerpts. Attachments and raw HTML are not sent. Treat the chosen provider as a recipient of these excerpts. Mail content is explicitly treated as untrusted data; the classifier has no tools and its output can only assign known categories, eligible custom labels, and a validated spam verdict. Mail already flagged as Spam and sent mail skip classification. Requests stream for subscription-backed proxy compatibility, with bounded responses and strict result validation. Timeouts, invalid output, and provider failures keep the heuristic result and log a warning without exposing provider response bodies or keys. Mailbox rules and imported state still run afterward and take precedence.
+Requests include sender, subject, selected mailing-list headers, and at most 6,000 characters of plain-text body, plus label guidance and bounded example excerpts. Attachments and raw HTML are not sent. Treat the chosen provider as a recipient of these excerpts. Mail content is explicitly treated as untrusted data; the classifier has no tools and its output can only assign eligible custom tags, and a validated spam verdict. Mail already flagged as Spam and sent mail skip classification. Requests stream for subscription-backed proxy compatibility, with bounded responses and strict result validation. Timeouts, invalid output, and provider failures keep mail deliverable in the inbox and log a warning without exposing provider response bodies or keys. Mailbox rules and imported state still run afterward and take precedence.
 
 Sorting applies to subsequently processed incoming mail and imports; existing stored mail is not reclassified. Successful model decisions are recorded in `sorting_results` alongside the final message transaction for troubleshooting.
 

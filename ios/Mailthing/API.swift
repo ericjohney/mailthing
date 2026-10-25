@@ -39,6 +39,9 @@ struct MailAPI {
         var body: [String: Any] = ["thread_ids": [id], "action": action, "value": value]
         if let until { body["until"] = until }
         let _: EmptyReply = try await request("actions", method: "POST", body: JSONSerialization.data(withJSONObject: body))
+        if ["read", "archive", "trash", "spam", "delete"].contains(action) {
+            await MailNotifications.clear(threadID: id)
+        }
     }
     func sortingMemories() async throws -> [SortingMemory] {
         try await request("sorting/memories")

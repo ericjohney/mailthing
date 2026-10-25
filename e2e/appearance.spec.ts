@@ -34,13 +34,7 @@ test('shares accessible palettes across the inbox, reader, compose, and persiste
   await page.keyboard.press('/');
   await expect(page.getByRole('textbox', { name: 'Search mail' })).toBeFocused();
   await expect(page.locator('.search-box')).toHaveCSS('outline-style', 'solid');
-  await page.getByRole('tab', { name: 'Primary', exact: true }).focus();
-  await page.keyboard.press('End');
-  await expect(page.getByRole('tab', { name: 'Updates', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
-  await page.keyboard.press('Home');
+  await expect(page.getByRole('tab', { name: 'Primary', exact: true })).toHaveCount(0);
   await expect(page.getByText(subject, { exact: true })).toBeVisible();
 
   for (const theme of ['Light', 'Dark']) {

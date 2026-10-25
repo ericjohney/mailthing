@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 : "${SIGNING_DIRECTORY:?Set the private directory holding the Mailthing profile and distribution certificate}"
 : "${ASC_KEY_ID:?}" "${ASC_ISSUER_ID:?}" "${ASC_KEY_PATH:?}"
 : "${BUILD_NUMBER:?Allocate a new App Store Connect build number}"
-export RELEASE_VERSION=${RELEASE_VERSION:-1.0.4}
+export RELEASE_VERSION=${RELEASE_VERSION:-1.0.5}
 [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'Invalid build number' >&2; exit 1; }
 [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release version' >&2; exit 1; }
 node scripts/apple.mjs validate-version
@@ -37,46 +37,71 @@ security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password"
 # Add the temporary chain without removing other running builds' chains.
 security list-keychains -d user -s "$keychain" "${saved_keychains[@]}"
 security cms -D -k "$keychain" -i "$SIGNING_DIRECTORY/Mailthing_AppStore.mobileprovision" > "$task_temp/profile.plist"
+security cms -D -k "$keychain" -i "$SIGNING_DIRECTORY/Mailthing_AutoFill_AppStore.mobileprovision" > "$task_temp/autofill-profile.plist"
+autofill_profile_uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$task_temp/autofill-profile.plist")
 profile_uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$task_temp/profile.plist")
-PROFILE_PATH="$task_temp/profile.plist" python3 - <<'PY'
+PROFILE_PATH="$task_temp/profile.plist" AUTOFILL_PROFILE_PATH="$task_temp/autofill-profile.plist" python3 - <<'PY'
 import datetime, os, plistlib
 p = plistlib.load(open(os.environ['PROFILE_PATH'], 'rb'))
 e = p['Entitlements']
 assert p['TeamIdentifier'] == ['27ZLS4MK3J']
 assert e['application-identifier'] == '27ZLS4MK3J.com.ericjohney.mailthing'
 assert e.get('aps-environment') == 'production', 'Profile must authorize production push'
+assert e.get('com.apple.developer.authentication-services.autofill-credential-provider') is True, 'Enable AutoFill Credential Provider on the host app profile too'
+assert 'group.com.ericjohney.mailthing' in e.get('com.apple.security.application-groups', []), 'Regenerate the app profile with the shared Mailthing App Group'
+assert e.get('get-task-allow') is False and 'ProvisionedDevices' not in p
+assert p['ExpirationDate'] > datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+p = plistlib.load(open(os.environ['AUTOFILL_PROFILE_PATH'], 'rb'))
+e = p['Entitlements']
+assert p['TeamIdentifier'] == ['27ZLS4MK3J']
+assert e['application-identifier'] == '27ZLS4MK3J.com.ericjohney.mailthing.autofill'
+assert e.get('com.apple.developer.authentication-services.autofill-credential-provider') is True, 'Enable AutoFill Credential Provider on the extension profile'
+assert 'group.com.ericjohney.mailthing' in e.get('com.apple.security.application-groups', []), 'Assign the shared Mailthing App Group to the extension'
 assert e.get('get-task-allow') is False and 'ProvisionedDevices' not in p
 assert p['ExpirationDate'] > datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 PY
 profile_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
 mkdir -p "$profile_dir"
 cp "$SIGNING_DIRECTORY/Mailthing_AppStore.mobileprovision" "$profile_dir/$profile_uuid.mobileprovision"
+cp "$SIGNING_DIRECTORY/Mailthing_AutoFill_AppStore.mobileprovision" "$profile_dir/$autofill_profile_uuid.mobileprovision"
 xcodegen generate
 archive=${ARCHIVE_PATH:-$PWD/build/Mailthing.xcarchive}
 export_path=${EXPORT_PATH:-$PWD/export}
 xcodebuild archive -project Mailthing.xcodeproj -scheme Mailthing -configuration Release -destination 'generic/platform=iOS' -archivePath "$archive" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" MARKETING_VERSION="$RELEASE_VERSION" DEVELOPMENT_TEAM=27ZLS4MK3J \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=B6EAE1911511211D276420A918E4C38825D5CFE6 \
-  PROVISIONING_PROFILE_SPECIFIER="$profile_uuid" OTHER_CODE_SIGN_FLAGS="--keychain $keychain"
-EXPORT_PLIST="$task_temp/export.plist" PROFILE_UUID="$profile_uuid" python3 - <<'PY'
+  MAILTHING_APP_PROFILE="$profile_uuid" MAILTHING_AUTOFILL_PROFILE="$autofill_profile_uuid" OTHER_CODE_SIGN_FLAGS="--keychain $keychain"
+EXPORT_PLIST="$task_temp/export.plist" PROFILE_UUID="$profile_uuid" AUTOFILL_PROFILE_UUID="$autofill_profile_uuid" python3 - <<'PY'
 import os, plistlib
-plistlib.dump({'method': 'app-store-connect', 'signingStyle': 'manual', 'teamID': '27ZLS4MK3J', 'manageAppVersionAndBuildNumber': False, 'uploadSymbols': True, 'provisioningProfiles': {'com.ericjohney.mailthing': os.environ['PROFILE_UUID']}}, open(os.environ['EXPORT_PLIST'], 'wb'))
+plistlib.dump({'method': 'app-store-connect', 'signingStyle': 'manual', 'teamID': '27ZLS4MK3J', 'manageAppVersionAndBuildNumber': False, 'uploadSymbols': True, 'provisioningProfiles': {'com.ericjohney.mailthing': os.environ['PROFILE_UUID'], 'com.ericjohney.mailthing.autofill': os.environ['AUTOFILL_PROFILE_UUID']}}, open(os.environ['EXPORT_PLIST'], 'wb'))
 PY
 xcodebuild -exportArchive -archivePath "$archive" -exportPath "$export_path" -exportOptionsPlist "$task_temp/export.plist"
 app="$archive/Products/Applications/Mailthing.app"
 codesign --verify --deep --strict "$app"
 codesign -d --entitlements :- "$app" > "$task_temp/entitlements.plist" 2>/dev/null
-ENTITLEMENTS="$task_temp/entitlements.plist" APP_PATH="$app" BUILD_NUMBER="$BUILD_NUMBER" RELEASE_VERSION="$RELEASE_VERSION" python3 - <<'PY'
+codesign -d --entitlements :- "$app/PlugIns/MailthingAutoFill.appex" > "$task_temp/autofill-entitlements.plist" 2>/dev/null
+AUTOFILL_ENTITLEMENTS="$task_temp/autofill-entitlements.plist" ENTITLEMENTS="$task_temp/entitlements.plist" APP_PATH="$app" BUILD_NUMBER="$BUILD_NUMBER" RELEASE_VERSION="$RELEASE_VERSION" python3 - <<'PY'
 import os, plistlib
 ent = plistlib.load(open(os.environ['ENTITLEMENTS'], 'rb'))
 info = plistlib.load(open(os.path.join(os.environ['APP_PATH'], 'Info.plist'), 'rb'))
 assert ent['aps-environment'] == 'production'
+assert ent.get('com.apple.developer.authentication-services.autofill-credential-provider') is True
 assert ent['application-identifier'] == '27ZLS4MK3J.com.ericjohney.mailthing'
 assert ent.get('get-task-allow', False) is False
 assert info['CFBundleIdentifier'] == 'com.ericjohney.mailthing'
 assert info['CFBundleVersion'] == os.environ['BUILD_NUMBER']
 assert info['CFBundleShortVersionString'] == os.environ['RELEASE_VERSION']
 assert info['MailthingServerURL'] == 'https://mailthing.ericj5.com'
+assert 'group.com.ericjohney.mailthing' in ent['com.apple.security.application-groups']
+ent = plistlib.load(open(os.environ['AUTOFILL_ENTITLEMENTS'], 'rb'))
+assert ent['application-identifier'] == '27ZLS4MK3J.com.ericjohney.mailthing.autofill'
+assert ent.get('com.apple.developer.authentication-services.autofill-credential-provider') is True
+assert 'group.com.ericjohney.mailthing' in ent['com.apple.security.application-groups']
+assert ent.get('get-task-allow', False) is False
+ext = plistlib.load(open(os.path.join(os.environ['APP_PATH'], 'PlugIns', 'MailthingAutoFill.appex', 'Info.plist'), 'rb'))
+assert ext['CFBundleVersion'] == info['CFBundleVersion']
+assert ext['CFBundleShortVersionString'] == info['CFBundleShortVersionString']
+assert ext['NSExtension']['NSExtensionAttributes']['ASCredentialProviderExtensionCapabilities']['ProvidesOneTimeCodes'] is True
 PY
 mkdir -p "$task_temp/private_keys"
 cp "$ASC_KEY_PATH" "$task_temp/private_keys/AuthKey_$ASC_KEY_ID.p8"

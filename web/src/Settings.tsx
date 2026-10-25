@@ -14,7 +14,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { api, encodeFile, mutate } from './api';
-import { categories, userLabels } from './mailbox/navigation';
+import { userLabels } from './mailbox/navigation';
 import type { PipelineStatus, Rule, SortingMemory, Settings as SettingsData } from './types';
 import {
   Button,
@@ -238,7 +238,7 @@ export function Settings({
           <>
             <SectionHeading
               title="Teach your mail sorter"
-              description="Describe what belongs in each category or label. Applying or removing labels teaches future sorting. Spam and Not spam corrections teach spam detection; your filters still take precedence."
+              description="Describe what belongs in each tag. Applying or removing labels teaches future sorting. Spam and Not spam corrections teach spam detection; your filters still take precedence."
             />
             <p className="muted">
               {settings.sorting_configured
@@ -391,7 +391,6 @@ export function Settings({
                   >
                     {[
                       ['label', 'Apply label'],
-                      ['category', 'Set category'],
                       ['archive', 'Archive'],
                       ['star', 'Star'],
                       ['important', 'Mark important'],
@@ -416,22 +415,6 @@ export function Settings({
                       {labels.map((label) => (
                         <option key={label.id} value={label.id}>
                           {label.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-                {rule.action === 'category' && (
-                  <Field label="Category">
-                    <select
-                      required
-                      value={rule.value}
-                      onChange={(event) => setRule({ ...rule, value: event.target.value })}
-                    >
-                      <option value="">Choose category</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
                         </option>
                       ))}
                     </select>

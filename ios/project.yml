@@ -7,7 +7,7 @@ settings:
   base:
     SWIFT_VERSION: '5.0'
     DEVELOPMENT_TEAM: 27ZLS4MK3J
-    MARKETING_VERSION: 1.0.4
+    MARKETING_VERSION: 1.0.5
     CURRENT_PROJECT_VERSION: 1
     TARGETED_DEVICE_FAMILY: '1,2'
     ENABLE_USER_SCRIPT_SANDBOXING: YES
@@ -21,12 +21,15 @@ targets:
   Mailthing:
     type: application
     platform: iOS
-    sources: [Mailthing]
+    sources: [Mailthing, Shared]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ericjohney.mailthing
+        PROVISIONING_PROFILE_SPECIFIER: $(MAILTHING_APP_PROFILE)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Mailthing/Mailthing.entitlements
+    dependencies:
+      - target: MailthingAutoFill
     info:
       path: Mailthing/Info.plist
       properties:
@@ -47,10 +50,46 @@ targets:
       path: Mailthing/Mailthing.entitlements
       properties:
         aps-environment: $(APNS_ENVIRONMENT)
+        com.apple.developer.authentication-services.autofill-credential-provider: true
+        com.apple.security.application-groups: [group.com.ericjohney.mailthing]
+  MailthingAutoFill:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: '18.0'
+    sources: [MailthingAutoFill, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ericjohney.mailthing.autofill
+        PROVISIONING_PROFILE_SPECIFIER: $(MAILTHING_AUTOFILL_PROFILE)
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: MailthingAutoFill/MailthingAutoFill.entitlements
+    info:
+      path: MailthingAutoFill/Info.plist
+      properties:
+        CFBundleDisplayName: Mailthing Codes
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.authentication-services-credential-provider-ui
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).CredentialProviderViewController
+          NSExtensionAttributes:
+            ASCredentialProviderExtensionCapabilities:
+              ProvidesOneTimeCodes: true
+              ProvidesPasswords: false
+    entitlements:
+      path: MailthingAutoFill/MailthingAutoFill.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.ericjohney.mailthing]
+        com.apple.developer.authentication-services.autofill-credential-provider: true
   MailthingTests:
     type: bundle.unit-test
     platform: iOS
     sources: [MailthingTests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: Mailthing
 schemes:

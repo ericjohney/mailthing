@@ -31,7 +31,7 @@ fn mime_decoding_sanitization_and_attachment_extraction() {
 }
 
 #[test]
-fn rules_override_categories_in_order_and_match_envelope_recipients() {
+fn rules_match_envelope_recipients_without_builtin_categories() {
     let rules = vec![
         Rule {
             id: "1".into(),
@@ -47,8 +47,8 @@ fn rules_override_categories_in_order_and_match_envelope_recipients() {
             name: "Personal".into(),
             field: "to".into(),
             contains: "ALEX@EXAMPLE.COM".into(),
-            action: "category".into(),
-            value: "CATEGORY_PERSONAL".into(),
+            action: "star".into(),
+            value: "".into(),
             enabled: true,
         },
         Rule {
@@ -64,12 +64,11 @@ fn rules_override_categories_in_order_and_match_envelope_recipients() {
     let mail = Pipeline::default()
         .run(&mail("Your invoice", "1", "Thanks"), &envelope(), &rules)
         .unwrap();
-    // "invoice" alone would categorize as Updates; the rule moves it to Primary.
-    assert_eq!(mail.category(), Some("CATEGORY_PERSONAL"));
+    assert!(mail.has_label("STARRED"));
     assert!(mail.has_label("finance"));
     assert!(mail.has_label("INBOX"));
     assert!(mail.has_label("UNREAD"));
-    assert!(!mail.has_label("CATEGORY_UPDATES"));
+    assert!(!mail.labels.iter().any(|l| l.starts_with("CATEGORY_")));
     assert_eq!(pipeline::normalize_subject(" Re: Fwd: RE: Hello "), "hello");
 }
 

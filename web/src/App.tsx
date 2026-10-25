@@ -47,13 +47,12 @@ import {
   IconButton,
   Modal,
   PageHeading,
-  Tabs,
   Toolbar,
   useMediaQuery,
 } from './design-system';
 import { MailboxSidebar } from './mailbox/MailboxSidebar';
 import { ThreadRow } from './mailbox/ThreadRow';
-import { categories, mailboxViews, userLabels } from './mailbox/navigation';
+import { mailboxViews, userLabels } from './mailbox/navigation';
 
 function getRoute(): Route {
   const params = new URLSearchParams(location.hash.slice(1));
@@ -68,7 +67,6 @@ export function App() {
   const [route, setRoute] = useState(getRoute);
   const [query, setQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [category, setCategory] = useState('CATEGORY_PERSONAL');
   const [threads, setThreads] = useState<Thread[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -180,7 +178,6 @@ export function App() {
         label: route.label === 'DRAFTS' ? 'ALL' : route.label,
         page: String(page),
       });
-      if (route.label === 'INBOX' && !searchQuery) params.set('category', category);
       if (searchQuery) params.set('q', searchQuery);
       api<{ threads: Thread[]; total: number }>(`/threads?${params}`)
         .then((data) => {
@@ -201,7 +198,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [route.label, route.thread, category, searchQuery, page, tick]);
+  }, [route.label, route.thread, searchQuery, page, tick]);
   useEffect(() => {
     if (!route.thread) {
       setConversation(undefined);
@@ -263,7 +260,6 @@ export function App() {
         unread: 'Marked as unread',
         label: 'Label applied',
         unlabel: 'Label removed',
-        category: 'Category updated',
         snooze: 'Snoozed until tomorrow',
         inbox: 'Moved to Inbox',
         delete: 'Permanently deleted',
@@ -318,7 +314,6 @@ export function App() {
       'Label';
   const selectionCount = selected.size;
   const isDrafts = route.label === 'DRAFTS' && !searchQuery;
-  const showCategories = route.label === 'INBOX' && !route.thread && !searchQuery;
 
   if (!settings)
     return (
@@ -677,15 +672,6 @@ export function App() {
                     </IconButton>
                     {dropdown === 'labels' && (
                       <div className="dropdown">
-                        <span className="dropdown-heading">Move to category</span>
-                        {categories.map((item) => (
-                          <button
-                            key={item.id}
-                            onClick={() => doAction('category', undefined, item.id)}
-                          >
-                            {item.name}
-                          </button>
-                        ))}
                         <span className="dropdown-heading">Apply a label</span>
                         {userLabels(settings.labels).map((label) => (
                           <button
@@ -767,33 +753,7 @@ export function App() {
                 </>
               )}
             </Toolbar>
-            {showCategories && (
-              <Tabs
-                className="category-tabs"
-                label="Inbox categories"
-                items={categories.map((item) => ({
-                  id: item.id,
-                  label: item.name,
-                  icon: <item.icon size={17} />,
-                }))}
-                value={category}
-                onValueChange={(value) => {
-                  setCategory(value);
-                  setSelected(new Set());
-                  setPage(1);
-                }}
-                panelId="message-list"
-              />
-            )}
-            <div
-              id="message-list"
-              className="message-list"
-              role={showCategories ? 'tabpanel' : undefined}
-              aria-label={
-                showCategories ? categories.find((item) => item.id === category)?.name : undefined
-              }
-              aria-busy={loading || busy}
-            >
+            <div id="message-list" className="message-list" aria-busy={loading || busy}>
               {loadError ? (
                 <div className="empty-state">
                   <ShieldAlert size={38} />
@@ -830,7 +790,7 @@ export function App() {
                     {searchQuery
                       ? 'Try a different search or include in:anywhere to search Spam and Trash.'
                       : route.label === 'INBOX'
-                        ? `Mail received by your server appears here. ${category !== 'CATEGORY_PERSONAL' ? 'This category is clear for now.' : 'Your inbox is ready when you are.'}`
+                        ? 'Mail received by your server appears here. Your inbox is ready when you are.'
                         : route.label === 'DRAFTS'
                           ? 'Start a message. We’ll save your thoughts as you go.'
                           : 'Conversations you move here will appear in this space.'}
@@ -949,8 +909,8 @@ export function App() {
               ))}
             </div>
             <p className="muted small">
-              Search supports from:, to:, subject:, label:, category:, is:unread, is:starred,
-              has:attachment, before: and after: dates, and in:anywhere.
+              Search supports from:, to:, subject:, label:, is:unread, is:starred, has:attachment,
+              before: and after: dates, and in:anywhere.
             </p>
           </div>
         </Modal>

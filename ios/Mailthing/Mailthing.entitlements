@@ -4,5 +4,11 @@
 <dict>
 	<key>aps-environment</key>
 	<string>$(APNS_ENVIRONMENT)</string>
+	<key>com.apple.developer.authentication-services.autofill-credential-provider</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.ericjohney.mailthing</string>
+	</array>
 </dict>
 </plist>

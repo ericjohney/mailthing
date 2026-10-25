@@ -145,7 +145,7 @@ pub fn payload(sender: &str, subject: &str, snippet: &str, thread_id: &str, unre
             "alert": {"title":sender.chars().take(100).collect::<String>(), "subtitle":subject.chars().take(150).collect::<String>(), "body":snippet.chars().take(240).collect::<String>()},
             "badge": unread,
             "sound":"default",
-            "thread-id":thread_id,
+            "thread-id":"mailthing.inbox",
             "content-available":1
         },
         "thread_id":thread_id
