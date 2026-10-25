@@ -8,7 +8,6 @@ final class MailStore: ObservableObject {
     @Published var settings: Settings?
     @Published var label = "INBOX"
     @Published var search = ""
-    @Published var unreadOnly = false
     @Published var path: [String] = []
     @Published var error: String?
     @Published var loading = false
@@ -34,7 +33,7 @@ final class MailStore: ObservableObject {
     func refresh() async {
         generation += 1
         let current = generation
-        let selectedLabel = label, selectedSearch = effectiveSearch
+        let selectedLabel = label, selectedSearch = search
         loading = true
         defer { if current == generation { loading = false } }
         do {
@@ -59,9 +58,6 @@ final class MailStore: ObservableObject {
             self.error = error.localizedDescription
         }
     }
-    var effectiveSearch: String {
-        [search, unreadOnly ? "is:unread" : ""].filter { !$0.isEmpty }.joined(separator: " ")
-    }
     private func query(label: String, search: String, page: Int) -> [URLQueryItem] {
         var result = [URLQueryItem(name: "label", value: label), URLQueryItem(name: "page", value: String(page))]
         if !search.isEmpty { result.append(URLQueryItem(name: "q", value: search)) }
@@ -73,14 +69,14 @@ final class MailStore: ObservableObject {
         loading = true
         defer { if current == generation { loading = false } }
         do {
-            let result: ThreadPage = try await api.request("threads", query: query(label: label, search: effectiveSearch, page: page + 1))
+            let result: ThreadPage = try await api.request("threads", query: query(label: label, search: search, page: page + 1))
             guard current == generation else { return }
             page += 1
             let ids = Set(threads.map(\.id))
             threads += result.threads.filter { !ids.contains($0.id) }
         } catch { if current == generation { self.error = error.localizedDescription } }
     }
-    func select(_ label: String) { self.label = label; search = ""; unreadOnly = false; path = [] }
+    func select(_ label: String) { self.label = label; search = ""; path = [] }
     func action(_ id: String, _ action: String, value: String = "", until: Int64? = nil) async {
         do { try await api.action(id, action, value: value, until: until); await refresh() }
         catch { self.error = error.localizedDescription }

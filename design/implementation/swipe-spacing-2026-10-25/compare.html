@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mailthing swipe spacing</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:transparent}body{font:13px var(--font-sans,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif);color:var(--foreground,#292929)}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid #24877c;outline-offset:3px}.intro{margin:0 0 14px;line-height:1.6;color:var(--muted-foreground,#737373)}.intro strong{color:var(--foreground,#292929)}.controls{display:flex;justify-content:space-between;gap:12px;margin-bottom:17px}.switch{display:flex;padding:3px;gap:3px;border:1px solid var(--border,#ddd);border-radius:10px}.switch button{border:0;background:transparent;border-radius:7px;padding:8px 12px;min-height:34px;font-size:12px}.switch button[aria-pressed="true"]{background:var(--foreground,#292929);color:var(--background,#fff)}.switch button:disabled{opacity:.4;cursor:default}.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}.item{min-width:0}h2{margin:0 0 9px;font-size:13px;font-weight:600}.panel{background:#fafafa;border:1px solid var(--border,#ddd);border-radius:var(--radius,14px);padding:16px;overflow:hidden}.panel.dark{background:#141414}.crop{display:block;width:100%;height:auto;aspect-ratio:402/124}.note{margin:10px 0 0;font-size:11px;line-height:1.6;color:var(--muted-foreground,#777)}.summary{font-size:12px;line-height:1.7;margin:17px 0 0;border-top:1px solid var(--border,#ddd);padding-top:12px;color:var(--muted-foreground,#777)}.summary strong{color:var(--foreground,#292929)}.source{display:none}@media(max-width:540px){.pair{grid-template-columns:1fr;gap:18px}.controls{gap:8px}.switch button{padding:7px 10px}}
+</style>
+</head>
+<body>
+<p class="intro"><strong>Balanced in both directions.</strong> Shorter Read/Unread labels stop the right-swipe buttons stretching into wider pills.</p>
+<div class="controls">
+  <div class="switch" aria-label="Compare swipe styling"><button type="button" data-version="before" aria-pressed="false">Before</button><button type="button" data-version="after" aria-pressed="true">Updated</button></div>
+  <div class="switch" aria-label="Appearance"><button type="button" data-theme="light" aria-pressed="true">Light</button><button type="button" data-theme="dark" aria-pressed="false">Dark</button></div>
+</div>
+<div class="pair">
+  <section class="item"><h2>Swipe right</h2><div class="panel"><canvas class="crop" width="402" height="124" aria-label="Native right-swipe actions"></canvas></div><p class="note">Read / Unread · Tags</p></section>
+  <section class="item"><h2>Swipe left</h2><div class="panel"><canvas class="crop" width="402" height="124" aria-label="Native left-swipe actions"></canvas></div><p class="note">Archive · Trash</p></section>
+</div>
+<p class="summary"><strong>Both sides: 50-point colored buttons, 10-point gaps and 10-point edge spacing.</strong> The full “Mark read” and “Mark unread” labels remain available to VoiceOver.<br>Actual simulator captures of the same sample conversation. Before captures use light appearance.</p>
+<div class="source" aria-hidden="true">
+  <img data-key="before-leading-light" src="before-leading.png" alt="">
+  <img data-key="before-trailing-light" src="before-trailing.png" alt="">
+  <img data-key="after-leading-light" src="leading-light.png" alt="">
+  <img data-key="after-trailing-light" src="trailing-light.png" alt="">
+  <img data-key="after-leading-dark" src="leading-dark.png" alt="">
+  <img data-key="after-trailing-dark" src="trailing-dark.png" alt="">
+</div>
+<script>
+let version='after',theme='light';
+function render(){
+  document.querySelectorAll('[data-version]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.version===version)));
+  document.querySelectorAll('[data-theme]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.theme===theme));button.disabled=version==='before'&&button.dataset.theme==='dark';});
+  ['leading','trailing'].forEach((edge,index)=>{
+    const image=document.querySelector(`[data-key="${version}-${edge}-${theme}"]`);
+    const canvas=document.querySelectorAll('.crop')[index];
+    canvas.getContext('2d').drawImage(image,0,115,402,124,0,0,402,124);
+    canvas.parentElement.classList.toggle('dark',theme==='dark');
+  });
+}
+document.addEventListener('click',event=>{
+  const button=event.target.closest('button');if(!button)return;
+  if(button.dataset.version){version=button.dataset.version;if(version==='before')theme='light';}
+  if(button.dataset.theme)theme=button.dataset.theme;
+  render();
+});
+function measure(image){
+  const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+  const context=canvas.getContext('2d',{willReadFrequently:true});context.drawImage(image,0,0);
+  const {data}=context.getImageData(0,110,canvas.width,130);
+  const specs={blue:(r,g,b)=>r<90&&g>60&&b>120&&b>g*1.1,amber:(r,g,b)=>r>120&&g>60&&b<60&&r>g*1.3,teal:(r,g,b)=>r<80&&g>80&&b>80&&g>b*.9&&Math.abs(g-b)<35,coral:(r,g,b)=>r>120&&g<120&&b<130&&r>g*1.6&&r>b*1.5};
+  const buttons=[];
+  for(const [color,test] of Object.entries(specs)){
+    let minX=canvas.width,minY=130,maxX=-1,maxY=-1;
+    for(let y=0;y<130;y++)for(let x=0;x<canvas.width;x++){const i=(y*canvas.width+x)*4;if(test(data[i],data[i+1],data[i+2])){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}}
+    if(maxX>=0)buttons.push({color,x:minX,y:minY+110,width:maxX-minX+1,height:maxY-minY+1});
+  }
+  buttons.sort((a,b)=>a.x-b.x);
+  const edge=image.dataset.key.includes('leading')?'leading':'trailing';
+  return {buttons,gap:buttons.length===2?buttons[1].x-buttons[0].x-buttons[0].width:null,outer:buttons.length===2?(edge==='leading'?buttons[0].x:canvas.width-buttons[1].x-buttons[1].width):null};
+}
+Promise.all([...document.querySelectorAll('.source img')].map(image=>image.decode())).then(()=>{
+  render();
+  const measurements=Object.fromEntries([...document.querySelectorAll('.source img')].map(image=>[image.dataset.key,measure(image)]));
+  for(const [name,result] of Object.entries(measurements))console.log(name,JSON.stringify(result));
+}).catch(error=>console.error(error.message));
+</script>
+</body>
+</html>

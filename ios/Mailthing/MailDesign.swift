@@ -15,6 +15,11 @@ extension Color {
     static let mailSurface = adaptiveGray(light: 0.94, dark: 0.13)
     static let mailDock = adaptiveGray(light: 1, dark: 0.14)
     static let mailBorder = adaptiveGray(light: 0.87, dark: 0.24)
+    // Rich enough for white swipe-action labels in both light and dark appearances.
+    static let mailSwipeArchive = Color(red: 0.09, green: 0.47, blue: 0.44)
+    static let mailSwipeRead = Color(red: 0.13, green: 0.43, blue: 0.61)
+    static let mailSwipeTag = Color(red: 0.64, green: 0.41, blue: 0.06)
+    static let mailSwipeTrash = Color(red: 0.72, green: 0.29, blue: 0.31)
     static let mailTint = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(white: 0.21, alpha: 1)

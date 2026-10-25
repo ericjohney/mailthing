@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mailthing — lighter inbox controls</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:transparent}body{color:var(--foreground,#262626);font:14px var(--font-sans,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif)}button,input,textarea{font:inherit}button{cursor:pointer;color:inherit}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #24877c;outline-offset:3px}button svg{pointer-events:none}[hidden]{display:none!important}svg{width:22px;height:22px;flex-shrink:0;vertical-align:middle}button{border:0;background:transparent}.studio{width:100%;max-width:900px;margin:0 auto}.controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 21px}.controls p{margin:0;font-size:13px;line-height:1.6;color:var(--muted-foreground,#6f6f6f)}.controls p strong{color:var(--foreground,#262626);font-weight:600}.theme-switch{display:flex;gap:3px;padding:3px;border:1px solid var(--border,#ddd);border-radius:11px;flex-shrink:0}.theme-switch button{padding:8px 13px;font-size:12px;border-radius:8px;min-height:34px}.theme-switch button[aria-pressed="true"]{background:var(--foreground,#272727);color:var(--background,#fff)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:29px 24px}.concept{min-width:0}.concept-title{display:flex;align-items:center;gap:9px;min-height:30px;margin-bottom:7px}.number{font-size:10px;font-weight:650;font-variant-numeric:tabular-nums;color:var(--muted-foreground,#6f6f6f)}h2{font-size:16px;letter-spacing:-.35px;font-weight:650;margin:0}.pick{margin-left:auto;font-size:10px;white-space:nowrap;font-weight:600;color:#227568;background:#e8f2ee;border-radius:20px;padding:5px 8px}.concept-note{color:var(--muted-foreground,#777);font-size:12px;line-height:1.6;margin:0 0 13px;min-height:39px}.phone{--bg:#fafafa;--ink:#292929;--sub:#858585;--surface:#f0f0f0;--avatar:#e7e7e7;--border:#dedede;--action:#303030;--on-action:#fff;--sheet:#fff;--controls-space:80px;position:relative;width:100%;aspect-ratio:390/814;overflow:hidden;border:5px solid #292929;border-radius:39px;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;padding:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;box-shadow:0 7px 18px #0000000c;font-size:13px;isolation:isolate}.phone[data-theme="dark"]{--bg:#141414;--ink:#eeeeee;--sub:#969696;--surface:#222;--avatar:#333;--border:#3c3c3c;--action:#ebebeb;--on-action:#222;--sheet:#202020}.phone button{color:inherit}.status{display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:48px;padding:6px 10px 0;font-size:13px;font-weight:700;position:relative}.island{position:absolute;width:92px;height:26px;top:-3px;left:50%;transform:translateX(-50%);background:#070707;border-radius:18px}.status-icons{display:flex;align-items:center;gap:5px}.status-icons svg{width:15px;height:15px}.battery{display:inline-flex;width:22px;height:11px;border:1px solid var(--sub);border-radius:3px;padding:1px;position:relative}.battery:after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:4px;background:var(--sub);border-radius:1px}.battery i{display:block;background:var(--ink);height:7px;width:17px;border-radius:1px}.header{display:flex;align-items:center;gap:2px;flex-shrink:0;height:59px;padding:0 2px 3px 7px}.title-wrap{display:flex;align-items:center;min-width:0;gap:9px;margin-right:auto}.mailbox-title{display:flex;align-items:center;gap:5px;min-height:44px;padding:0;font-size:22px;font-weight:650;letter-spacing:-.6px;white-space:nowrap}.mailbox-title svg{width:13px;height:13px;color:var(--sub)}.unread-count{font-size:11px;color:var(--sub);white-space:nowrap}.tap{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0;flex-shrink:0}.tap svg{width:21px;height:21px}.mail-list{overflow:auto;min-height:0;flex:1;padding:0 0 calc(var(--controls-space) + 12px);scrollbar-width:none}.mail-list::-webkit-scrollbar{display:none}.message{display:flex;align-items:flex-start;gap:9px;padding:13px 11px;margin:3px 0 6px;border-radius:15px;min-height:102px}.message.unread{background:var(--surface)}.avatar{position:relative;border-radius:50%;width:31px;height:31px;min-width:31px;display:flex;align-items:center;justify-content:center;background:var(--avatar);font-size:10px;font-weight:650;margin-top:1px}.message.unread .avatar:after{content:"";position:absolute;width:7px;height:7px;bottom:0;right:-1px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px var(--surface)}.message-content{min-width:0;flex:1}.sender-line{display:flex;align-items:baseline;gap:6px;line-height:1.45}.sender{font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.message.unread .sender{font-weight:650}.time{margin-left:auto;color:var(--sub);font-size:10px;white-space:nowrap}.subject{font-size:12px;margin-top:2px;line-height:1.45;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.message.unread .subject{font-weight:600}.snippet{font-size:12px;line-height:1.45;color:var(--sub);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.tag{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;background:var(--avatar);border-radius:15px;font-size:9px;line-height:1}.tag svg{width:11px;height:11px}.attachment{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--sub);margin-top:6px}.attachment svg{width:12px;height:12px}.compose-floating{display:flex;align-items:center;justify-content:center;width:53px;height:53px;border-radius:19px;background:var(--action)!important;color:var(--on-action)!important;box-shadow:0 4px 13px #00000017}.compose-floating svg{width:24px;height:24px}.single-compose{position:absolute;bottom:29px;right:21px;z-index:2}.bottom-scrim{position:absolute;bottom:0;left:0;right:0;height:104px;background:linear-gradient(to bottom,transparent,var(--bg) 65%);pointer-events:none;z-index:1}.split-controls{position:absolute;left:19px;right:19px;bottom:28px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:2}.mini-pill{display:flex;align-items:center;padding:3px 4px;background:var(--sheet);border:1px solid var(--border);border-radius:25px;box-shadow:0 3px 10px #00000008}.mini-pill .tap{min-width:42px;min-height:42px}.mini-pill .tap svg{width:20px;height:20px}.mini-divider{width:1px;height:17px;background:var(--border)}.compose-text{display:flex;align-items:center;justify-content:center;gap:8px;padding:0 15px;min-height:50px;background:var(--action)!important;color:var(--on-action)!important;border-radius:25px;font-size:12px;font-weight:600;box-shadow:0 3px 10px #00000010}.compose-text svg{width:20px;height:20px}.native-controls{position:absolute;left:0;right:0;bottom:0;padding:8px 16px 23px;min-height:83px;display:flex;justify-content:space-between;align-items:flex-start;border-top:1px solid var(--border);background:var(--bg);z-index:2}.native-item{min-height:45px;min-width:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:9px;color:var(--ink)}.native-item svg{width:21px;height:21px}.home-indicator{position:absolute;width:105px;height:4px;background:var(--ink);bottom:8px;left:50%;transform:translateX(-50%);border-radius:8px;opacity:.8;z-index:4;pointer-events:none}.phone[data-design="header"]{--controls-space:16px}.phone[data-design="header"] .header{padding-right:0}.phone[data-design="header"] .title-wrap{gap:7px}.phone[data-design="header"] .unread-count{font-size:10px}.phone[data-design="header"] .mailbox-title{font-size:21px}.phone[data-design="header"] .header>.tap{min-width:39px}.search-inline{display:flex;gap:7px;align-items:center;flex-shrink:0;min-height:43px;border-radius:11px;background:var(--surface);padding:0 3px 0 11px;margin:1px 2px 10px}.search-inline>svg{height:16px;width:16px;color:var(--sub)}.search-inline input{flex:1;min-width:0;width:100%;background:transparent;border:0;outline:0;color:var(--ink);font-size:12px}.search-inline input::placeholder{color:var(--sub)}.search-inline .tap{min-width:34px;min-height:40px}.search-inline .tap svg{width:16px;height:16px}.empty{padding:35px 16px;text-align:center;color:var(--sub);font-size:12px}.where{font-size:11px;line-height:1.6;color:var(--muted-foreground,#777);margin:11px 1px 0}.where strong{color:var(--foreground,#333);font-weight:550}.footnote{margin:23px 0 0;border-top:1px solid var(--border,#ddd);padding-top:15px;color:var(--muted-foreground,#777);font-size:11px;line-height:1.7}.overlay{position:absolute;inset:0;background:#0005;z-index:6;display:flex;align-items:flex-end;padding:12px}.sheet{background:var(--sheet);padding:16px;border-radius:22px;width:100%;max-height:85%;overflow:auto;color:var(--ink);box-shadow:0 8px 25px #0002}.sheet-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}.sheet-top strong{font-size:18px;letter-spacing:-.4px}.sheet-top .close{min-height:37px;min-width:40px;border-radius:20px;background:var(--surface)}.sheet-top .close svg{height:17px;width:17px}.overlay[data-kind="folders"]{align-items:stretch;padding:0}.overlay[data-kind="folders"] .sheet{width:86%;border-radius:0 22px 22px 0;max-height:none;padding:67px 16px 25px}.folder{display:flex;gap:11px;width:100%;align-items:center;padding:12px 10px;min-height:44px;border-radius:10px;font-size:13px;text-align:left}.folder svg{width:19px;height:19px;color:var(--sub)}.folder span:last-child{margin-left:auto;color:var(--sub);font-size:11px}.folder.active{background:var(--surface);font-weight:600}.folder-label{margin:20px 10px 8px;font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.7px}.compose-field{border-top:1px solid var(--border);padding:11px 0;display:flex;gap:10px;align-items:center;font-size:12px}.compose-field span{color:var(--sub);min-width:42px}.compose-field input{border:0;min-width:0;width:100%;background:transparent;outline:0;color:var(--ink);font-size:12px}.compose-body{padding:12px 0 5px;border-top:1px solid var(--border)}.compose-body textarea{width:100%;height:180px;resize:vertical;background:transparent;color:var(--ink);border:0;outline:0;font-size:13px;line-height:1.6}.compose-body textarea::placeholder{color:var(--sub)}.local-note{font-size:10px;color:var(--sub);margin:7px 0 0}.sheet .preview-done{font-size:12px;color:var(--ink);font-weight:600;min-height:37px;padding:0 4px}.motion-off *{scroll-behavior:auto!important}@media(max-width:590px){.grid{grid-template-columns:1fr;gap:27px}.concept{max-width:390px;width:100%;margin:0 auto}.controls{align-items:flex-start;gap:10px}.controls p{font-size:12px;max-width:200px}.theme-switch button{font-size:11px;padding:7px 10px}.concept-note{min-height:0}.phone{aspect-ratio:390/810}.pick{font-size:10px}.where{font-size:12px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<main class="studio">
+  <div class="controls">
+    <p><strong>Same inbox. Less bar.</strong><br>Try the mailbox, search and compose controls.</p>
+    <div class="theme-switch" aria-label="Mockup appearance">
+      <button type="button" data-theme="light" aria-pressed="true">Light</button>
+      <button type="button" data-theme="dark" aria-pressed="false">Dark</button>
+    </div>
+  </div>
+  <div class="grid" id="concepts"></div>
+  <p class="footnote">My pick: <strong>01</strong> keeps Compose within thumb reach and gives almost the entire bottom edge back to the inbox. <strong>02</strong> keeps all three controls close to your thumb. These are interactive design studies with fictional mail; the native app is unchanged.</p>
+</main>
+<script>
+const paths={
+  menu:'<path d="M4 6h16M4 12h16M4 18h11"/>',
+  search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+  compose:'<path d="M12 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7M16 3l5 5M9 15l1-5L19 1l5 5-9 9Z"/>',
+  down:'<path d="m6 9 6 6 6-6"/>',
+  inbox:'<path d="m4 4-2 10v6h20v-6L20 4Z"/><path d="M2 14h6l2 3h4l2-3h6"/>',
+  unread:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  star:'<path d="m12 3 2.8 5.7 6.3.9-4.6 4.5 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.3-.9Z"/>',
+  sent:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="m22 2-11 11"/>',
+  archive:'<rect x="3" y="3" width="18" height="5" rx="1"/><path d="M5 8v13h14V8M10 12h4"/>',
+  tag:'<path d="m21 12-9 9-10-10V3h8Z"/><circle cx="7" cy="7" r="1"/>',
+  clip:'<path d="m8 12 7-7a4 4 0 0 1 6 6L10 22a6 6 0 0 1-8-8L13 3M5 16 16 5"/>',
+  wifi:'<path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r=".7" fill="currentColor"/>',
+  signal:'<path d="M4 17v4M9 13v8M14 8v13M19 3v18" stroke-width="3"/>',
+  close:'<path d="m6 6 12 12M18 6 6 18"/>',
+};
+const icon=name=>`<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.inbox}</svg>`;
+const escapeHTML=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mail=[
+  {sender:'Nora Chen',initials:'NC',subject:'The photos from our trip',snippet:'Finally went through the camera roll. A few favorites attached.',time:'10:42 AM',unread:true,tags:['Travel'],attachment:false},
+  {sender:'Bookshop',initials:'B',subject:'Receipt for your recent purchase',snippet:'Thanks for supporting independent bookstores. Your receipt is attached.',time:'10:18 AM',unread:true,tags:[],attachment:true},
+  {sender:'LinkedIn',initials:'L',subject:'Nora sent you a connection request',snippet:'Catch up with the people in your circle.',time:'9:56 AM',unread:false,tags:[],attachment:false},
+  {sender:'Parcel',initials:'P',subject:'Your order has been delivered',snippet:'Your package arrived today. We hope it finds a good place in your home.',time:'9:32 AM',unread:true,tags:[],attachment:false},
+  {sender:'Field Notes',initials:'FN',subject:'Your Sunday newsletter',snippet:'A slower pace, a few good reads, and a recipe worth keeping.',time:'9:18 AM',unread:true,tags:[],attachment:false},
+  {sender:'Julian Park',initials:'JP',subject:'Notes from today',snippet:'A couple of things to keep in mind from our conversation.',time:'Yesterday',unread:false,tags:['Work'],attachment:false},
+  {sender:'Leah Brooks',initials:'LB',subject:'A small thank you',snippet:'Thank you for your help yesterday. Lunch is on me next time.',time:'Yesterday',unread:false,tags:[],attachment:false},
+];
+const concepts=[
+  {id:'floating',number:'01',name:'One floating action',pick:true,note:'Lose the container. Keep a single Compose button within reach.',where:'<strong>Mailboxes</strong> in the title · <strong>Search</strong> at the top · <strong>Compose</strong> floats'},
+  {id:'split',number:'02',name:'Split controls',note:'A small utility pill and a separate Compose button. All three stay low.',where:'<strong>Same thumb reach.</strong> More open space between the controls.'},
+  {id:'native',number:'03',name:'Flat native toolbar',note:'A thin, familiar edge toolbar with labels. No floating capsule.',where:'<strong>Clearest labels.</strong> Still reserves a strip across the bottom.'},
+  {id:'header',number:'04',name:'Header only',note:'Give the entire bottom edge to your mail. Everything lives at the top.',where:'<strong>Most open inbox.</strong> Search and Compose take a longer reach.'},
+];
+const state=new Map(concepts.map(c=>[c.id,{folder:'Inbox',query:'',draft:{to:'',subject:'',body:''}}]));
+const tap=(action,symbol,label,extra='')=>`<button type="button" class="tap ${extra}" data-action="${action}" aria-label="${label}" title="${label}">${icon(symbol)}</button>`;
+function bottom(id){
+  if(id==='floating')return `<div class="bottom-scrim"></div>${tap('compose','compose','Compose','compose-floating single-compose')}`;
+  if(id==='split')return `<div class="bottom-scrim"></div><div class="split-controls"><div class="mini-pill">${tap('folders','menu','Open mailboxes')}<span class="mini-divider"></span>${tap('search','search','Search mail')}</div><button type="button" class="compose-text" data-action="compose">${icon('compose')}<span>Compose</span></button></div>`;
+  if(id==='native')return `<nav class="native-controls" aria-label="Inbox actions"><button type="button" class="native-item" data-action="folders">${icon('menu')}<span>Mailboxes</span></button><button type="button" class="native-item" data-action="search">${icon('search')}<span>Search</span></button><button type="button" class="native-item" data-action="compose">${icon('compose')}<span>Compose</span></button></nav>`;
+  return '';
+}
+function renderRows(phone){
+  const s=state.get(phone.dataset.design);
+  const rows=mail.filter(m=>(s.folder!=='Unread'||m.unread)&&(!['Travel','Work','Receipts'].includes(s.folder)||m.tags.includes(s.folder))&&(!['Sent','Archive','Starred'].includes(s.folder))).filter(m=>`${m.sender} ${m.subject} ${m.snippet} ${m.tags.join(' ')}`.toLowerCase().includes(s.query.toLowerCase()));
+  phone.querySelector('.mail-list').innerHTML=rows.length?rows.map(m=>`<div class="message${m.unread?' unread':''}"><div class="avatar">${m.initials}</div><div class="message-content"><div class="sender-line"><span class="sender">${m.sender}</span><time class="time">${m.time}</time></div><div class="subject">${m.subject}</div><div class="snippet">${m.snippet}</div>${m.tags.length?`<div class="tags">${m.tags.map(t=>`<span class="tag">${icon('tag')}${t}</span>`).join('')}</div>`:''}${m.attachment?`<span class="attachment">${icon('clip')}Attachment</span>`:''}</div></div>`).join(''):'<div class="empty">No matching messages</div>';
+  phone.querySelector('.mailbox-name').textContent=s.folder;
+  phone.querySelector('.mailbox-title').setAttribute('aria-label',`Choose mailbox, ${s.folder}`);
+  const unread=rows.filter(m=>m.unread).length;
+  phone.querySelector('.unread-count').textContent=unread?`${unread} unread`:'';
+}
+function render(){
+  document.getElementById('concepts').innerHTML=concepts.map(c=>`<section class="concept" aria-labelledby="title-${c.id}"><div class="concept-title"><span class="number">${c.number}</span><h2 id="title-${c.id}">${c.name}</h2>${c.pick?'<span class="pick">My pick</span>':''}</div><p class="concept-note">${c.note}</p><div class="phone" data-design="${c.id}" data-theme="light" aria-label="${c.name} inbox mockup"><div class="status"><span>9:41</span><span class="island" aria-hidden="true"></span><span class="status-icons" aria-hidden="true">${icon('signal')}${icon('wifi')}<span class="battery"><i></i></span></span></div><header class="header"><div class="title-wrap"><button type="button" class="mailbox-title" data-action="folders" aria-label="Choose mailbox, Inbox"><span class="mailbox-name">Inbox</span>${icon('down')}</button><span class="unread-count">4 unread</span></div>${['floating','header'].includes(c.id)?tap('search','search','Search mail'):''}${c.id==='header'?tap('compose','compose','Compose'):''}</header><div class="search-inline" hidden>${icon('search')}<input type="search" aria-label="Search mail in ${c.name}" placeholder="Search mail">${tap('close-search','close','Close search')}</div><div class="mail-list" aria-label="Sample conversations" tabindex="0"></div>${bottom(c.id)}<div class="home-indicator" aria-hidden="true"></div><div class="overlay" hidden><section class="sheet" aria-label="Preview controls"></section></div></div><p class="where">${c.where}</p></section>`).join('');
+  document.querySelectorAll('.phone').forEach(renderRows);
+}
+function showFolders(phone){
+  const s=state.get(phone.dataset.design),overlay=phone.querySelector('.overlay');
+  overlay.dataset.kind='folders';
+  overlay.querySelector('.sheet').innerHTML=`<div class="sheet-top"><strong>Mailboxes</strong>${tap('close','close','Close mailboxes','close')}</div>${[['Inbox','inbox','4'],['Unread','unread','4'],['Starred','star',''],['Sent','sent',''],['Archive','archive','']].map(([name,symbol,count])=>`<button type="button" class="folder${s.folder===name?' active':''}" data-folder="${name}">${icon(symbol)}<span>${name}</span><span>${count}</span></button>`).join('')}<p class="folder-label">Your tags</p>${['Travel','Work','Receipts'].map(name=>`<button type="button" class="folder${s.folder===name?' active':''}" data-folder="${name}">${icon('tag')}<span>${name}</span></button>`).join('')}`;
+  overlay.hidden=false;
+}
+function showCompose(phone){
+  const draft=state.get(phone.dataset.design).draft,overlay=phone.querySelector('.overlay');
+  overlay.dataset.kind='compose';
+  overlay.querySelector('.sheet').innerHTML=`<div class="sheet-top"><strong>New message</strong><button type="button" class="preview-done" data-action="close">Done</button></div><label class="compose-field"><span>To</span><input type="email" aria-label="Recipient" placeholder="name@example.com" data-field="to" value="${escapeHTML(draft.to)}"></label><label class="compose-field"><span>Subject</span><input type="text" aria-label="Subject" placeholder="Subject" data-field="subject" value="${escapeHTML(draft.subject)}"></label><div class="compose-body"><textarea aria-label="Message" placeholder="Write a message…" data-field="body">${escapeHTML(draft.body)}</textarea></div><p class="local-note">Draft preview</p>`;
+  overlay.hidden=false;
+}
+function closeOverlay(phone){phone.querySelector('.overlay').hidden=true;}
+document.addEventListener('click',event=>{
+  const themeButton=event.target.closest('.theme-switch button');
+  if(themeButton){document.querySelectorAll('.phone').forEach(phone=>phone.dataset.theme=themeButton.dataset.theme);document.querySelectorAll('.theme-switch button').forEach(button=>button.setAttribute('aria-pressed',String(button===themeButton)));return;}
+  const phone=event.target.closest('.phone');if(!phone)return;
+  const folderButton=event.target.closest('[data-folder]');
+  if(folderButton){const s=state.get(phone.dataset.design);s.folder=folderButton.dataset.folder;s.query='';phone.querySelector('.search-inline input').value='';phone.querySelector('.search-inline').hidden=true;renderRows(phone);closeOverlay(phone);return;}
+  const action=event.target.closest('[data-action]')?.dataset.action;
+  if(action==='folders')showFolders(phone);
+  if(action==='compose')showCompose(phone);
+  if(action==='close'||event.target===phone.querySelector('.overlay'))closeOverlay(phone);
+  if(action==='search'){const box=phone.querySelector('.search-inline');box.hidden=false;box.querySelector('input').focus();}
+  if(action==='close-search'){state.get(phone.dataset.design).query='';phone.querySelector('.search-inline').hidden=true;phone.querySelector('.search-inline input').value='';renderRows(phone);}
+});
+document.addEventListener('input',event=>{
+  const phone=event.target.closest('.phone');if(!phone)return;
+  const s=state.get(phone.dataset.design);
+  if(event.target.matches('.search-inline input')){s.query=event.target.value;renderRows(phone);}
+  if(event.target.dataset.field)s.draft[event.target.dataset.field]=event.target.value;
+});
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape')document.querySelectorAll('.phone').forEach(phone=>{closeOverlay(phone);if(!phone.querySelector('.search-inline').hidden){state.get(phone.dataset.design).query='';phone.querySelector('.search-inline').hidden=true;phone.querySelector('.search-inline input').value='';renderRows(phone);}});
+});
+render();
+// Bounded checks keep the standalone prototype usable as the layout changes.
+window.checkMockups=()=>{
+  const failures=[];
+  const expect=(condition,message)=>{if(!condition)failures.push(message);};
+  for(const phone of document.querySelectorAll('.phone')){
+    const name=phone.dataset.design;
+    expect(phone.querySelectorAll('.message').length===mail.length,`${name}: initial rows`);
+    phone.querySelector('[data-action="folders"]').click();
+    expect(!phone.querySelector('.overlay').hidden,`${name}: folders open`);
+    phone.querySelector('[data-folder="Unread"]').click();
+    expect(phone.querySelectorAll('.message').length===4,`${name}: unread selection`);
+    showFolders(phone);phone.querySelector('[data-folder="Inbox"]').click();
+    phone.querySelector('[data-action="search"]').click();
+    const input=phone.querySelector('.search-inline input');input.value='bookshop';input.dispatchEvent(new Event('input',{bubbles:true}));
+    expect(phone.querySelectorAll('.message').length===1,`${name}: search`);
+    phone.querySelector('[data-action="close-search"]').click();
+    phone.querySelector('[data-action="compose"]').click();
+    expect(phone.querySelector('.overlay').dataset.kind==='compose'&&!phone.querySelector('.overlay').hidden,`${name}: compose`);
+    const subject=phone.querySelector('[data-field="subject"]');subject.value='A weekend plan';subject.dispatchEvent(new Event('input',{bubbles:true}));
+    closeOverlay(phone);showCompose(phone);
+    expect(phone.querySelector('[data-field="subject"]').value==='A weekend plan',`${name}: retain draft`);
+    state.get(name).draft={to:'',subject:'',body:''};closeOverlay(phone);
+  }
+  for(const theme of ['dark','light']){
+    document.querySelector(`.theme-switch button[data-theme="${theme}"]`).click();
+    expect([...document.querySelectorAll('.phone')].every(p=>p.dataset.theme===theme),`${theme}: theme switch`);
+  }
+  if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+  document.querySelectorAll('.mail-list').forEach(list=>list.scrollTop=0);
+  window.scrollTo(0,0);
+  expect(document.documentElement.scrollWidth<=window.innerWidth+1,'page horizontal overflow');
+  const result={concepts:concepts.length,appearance:'light and dark',failures};
+  console.log('Mockup checks',JSON.stringify(result));
+  return result;
+};
+requestAnimationFrame(()=>window.checkMockups());
+</script>
+</body>
+</html>

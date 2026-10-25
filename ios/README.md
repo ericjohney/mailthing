@@ -22,18 +22,24 @@ The app never presents invented messages as mailbox data.
 
 ## Interface
 
-The quiet header shows the current mailbox and unread count, with an unread filter.
-A bottom dock holds mailbox navigation, search and compose. Folders and custom tags
-are available through the mailbox title or dock. The mailbox panel slides in;
+The quiet header shows the Mailthing logo, current mailbox and unread count, with
+Search and Compose on the right. Tap the logo to open folders and custom tags;
+choose Unread to see only unread mail. The inbox has no bottom bar, leaving more
+space for messages. The mailbox panel slides in;
 selecting a mailbox or swiping left closes it. Built-in inbox categories have been
 removed from both clients and automatic sorting. Existing mail and custom tags are
 preserved by migration 0007.
 
 Message rows show local sender initials, unread indicators, and custom tag chips.
-Tap the row's tag button to select multiple tags or create one. The reader offers
+Swipe right and choose Tags, or long-press a row and choose Tags, to select multiple
+tags or create one. The reader offers
 an Add tags control under the subject and a tag button in its bottom action dock.
 Save applies the complete custom-tag selection atomically; Cancel leaves it unchanged.
-Swipe or long-press a conversation to mark it read/unread or star it.
+Swipe right for blue Read/Unread and amber Tags actions; swipe left for teal Archive
+and coral Trash. Each action has an icon and a label. Read/unread and star actions
+are also available by long-pressing a conversation.
+Short swipe labels keep the native button widths consistent in both directions;
+VoiceOver uses the full Mark read/Mark unread action labels.
 
 The reader has a quiet back/more header and bottom archive, tag and reply actions.
 Sender details stay with each message. Each message in a longer conversation retains

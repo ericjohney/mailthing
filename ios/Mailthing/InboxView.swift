@@ -60,7 +60,7 @@ struct InboxView: View {
             .sheet(item: $tags) { target in TagPicker(threadID: target.id) }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(item: $compose, onDismiss: { Task { await store.refresh() } }) { ComposeView(initial: $0) }
-            .task(id: "\(store.label)|\(store.search)|\(store.unreadOnly)") {
+            .task(id: "\(store.label)|\(store.search)") {
                 do {
                     if !store.search.isEmpty { try await Task.sleep(for: .milliseconds(350)) }
                     try Task.checkCancellation()
@@ -86,7 +86,6 @@ struct InboxView: View {
             }
         }
         .background(Color.mailCanvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom, spacing: 0) { inboxDock }
         .toolbar(.hidden, for: .navigationBar)
     }
 
@@ -111,42 +110,33 @@ struct InboxView: View {
 
     private var header: some View {
         let textLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 10))
-        return HStack(alignment: .center, spacing: 10) {
+        return HStack(alignment: .center, spacing: 8) {
+            Button { setSidebar(true) } label: {
+                MailMark(size: 30)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open mailboxes")
+            .accessibilityHint("Shows folders and tags")
             textLayout {
-                Button { setSidebar(true) } label: {
-                    HStack(spacing: 5) {
-                        Text(store.title).font(.title2.weight(.semibold)).lineLimit(1)
-                        Image(systemName: "chevron.down").font(.caption2).dynamicTypeSize(...DynamicTypeSize.xxxLarge).foregroundStyle(.secondary)
-                    }.frame(minHeight: 44).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityLabel("Choose mailbox, \(store.title)")
+                Text(store.title).font(.title2.weight(.semibold)).lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
                 if let unread = store.settings?.counts[store.label]?.unread, unread > 0 {
                     Text("\(unread) unread").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
             }.layoutPriority(1)
             Spacer(minLength: 0)
             if store.loading { ProgressView().controlSize(.mini).accessibilityLabel("Refreshing mailbox") }
-            if store.label != "DRAFTS" {
-                MailIconButton(symbol: store.unreadOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease", label: store.unreadOnly ? "Show all messages" : "Filter unread messages") {
-                    store.unreadOnly.toggle()
-                }.accessibilityValue(store.unreadOnly ? "Unread only" : "All messages")
-            }
-        }
-        .padding(.leading, 28).padding(.trailing, 12).frame(minHeight: 54)
-        .background(Color.mailCanvas)
-    }
-
-    private var inboxDock: some View {
-        MailDock {
-            MailIconButton(symbol: "line.3.horizontal", label: "Open mailboxes") { setSidebar(true) }
-            Spacer()
             MailIconButton(symbol: "magnifyingglass", label: "Search mail") {
                 showSearch = true; searching = true
             }
-            Spacer()
-            MailIconButton(symbol: "square.and.pencil", label: "Compose", emphasized: true) {
+            MailIconButton(symbol: "square.and.pencil", label: "Compose") {
                 searching = false; compose = Draft()
             }
         }
+        .padding(.horizontal, 12).frame(minHeight: 54)
+        .background(Color.mailCanvas)
     }
 
     private var searchBar: some View {
@@ -176,12 +166,9 @@ struct InboxView: View {
                 HStack(alignment: .top, spacing: 4) {
                     Button { searching = false; store.path.append(thread.id) } label: { ThreadRow(thread: thread, labels: store.settings?.labels.filter { $0.kind == "user" && thread.labelIds.contains($0.id) } ?? []) }
                         .buttonStyle(.plain)
-                    VStack(spacing: 2) {
-                        MailIconButton(symbol: "tag", label: "Edit tags for \(thread.subject)") { tags = TagTarget(id: thread.id) }
-                        if thread.starred {
-                            MailIconButton(symbol: "star.fill", label: "Unstar \(thread.subject)") {
-                                Task { await store.action(thread.id, "unstar") }
-                            }
+                    if thread.starred {
+                        MailIconButton(symbol: "star.fill", label: "Unstar \(thread.subject)") {
+                            Task { await store.action(thread.id, "unstar") }
                         }
                     }
                 }
@@ -201,16 +188,23 @@ struct InboxView: View {
                     }
                 }
                 .swipeActions(edge: .trailing) {
-                    Button("Trash", role: .destructive) { Task { await store.action(thread.id, "trash") } }
-                    Button("Archive", systemImage: "archivebox") { Task { await store.action(thread.id, "archive") } }.tint(.mailAction)
+                    Button(role: .destructive) {
+                        Task { await store.action(thread.id, "trash") }
+                    } label: {
+                        Label("Trash", systemImage: "trash.fill")
+                    }.tint(.mailSwipeTrash)
+                    Button("Archive", systemImage: "archivebox.fill") {
+                        Task { await store.action(thread.id, "archive") }
+                    }.tint(.mailSwipeArchive)
                 }
                 .swipeActions(edge: .leading) {
-                    Button(thread.unread > 0 ? "Mark read" : "Mark unread", systemImage: thread.unread > 0 ? "envelope.open" : "envelope.badge") {
+                    Button(thread.unread > 0 ? "Read" : "Unread", systemImage: thread.unread > 0 ? "envelope.open.fill" : "envelope.badge.fill") {
                         Task { await store.action(thread.id, thread.unread > 0 ? "read" : "unread") }
-                    }.tint(.mailAction)
-                    Button(thread.starred ? "Unstar" : "Star", systemImage: "star") {
-                        Task { await store.action(thread.id, thread.starred ? "unstar" : "star") }
-                    }.tint(.gray)
+                    }.tint(.mailSwipeRead)
+                        .accessibilityLabel(thread.unread > 0 ? "Mark read" : "Mark unread")
+                    Button("Tags", systemImage: "tag.fill") {
+                        tags = TagTarget(id: thread.id)
+                    }.tint(.mailSwipeTag)
                 }
             }
             if store.threads.count < store.total {
@@ -238,7 +232,13 @@ struct InboxView: View {
                         Text(draft.body).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                     }.foregroundStyle(.primary).padding(.vertical, 6)
                 }
-                .swipeActions { Button("Delete", role: .destructive) { Task { await deleteDraft(draft) } } }
+                .swipeActions {
+                    Button(role: .destructive) {
+                        Task { await deleteDraft(draft) }
+                    } label: {
+                        Label("Delete", systemImage: "trash.fill")
+                    }.tint(.mailSwipeTrash)
+                }
             }
         }
         .listStyle(.plain).scrollContentBackground(.hidden).background(Color.mailCanvas)

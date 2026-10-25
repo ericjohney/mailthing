@@ -106,14 +106,13 @@ final class MailthingTests: XCTestCase {
     }
 
     @MainActor
-    func testUnreadFilterCombinesWithSearchAndResetsOnMailboxChange() {
+    func testMailboxChangeClearsSearchAndConversation() {
         let store = MailStore()
         store.search = "from:sam@example.net"
-        store.unreadOnly = true
-        XCTAssertEqual(store.effectiveSearch, "from:sam@example.net is:unread")
+        store.path = ["conversation"]
         store.select("Travel")
-        XCTAssertEqual(store.effectiveSearch, "")
-        XCTAssertFalse(store.unreadOnly)
+        XCTAssertEqual(store.search, "")
+        XCTAssertTrue(store.path.isEmpty)
         XCTAssertEqual(store.label, "Travel")
     }
 
