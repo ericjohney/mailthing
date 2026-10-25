@@ -22,16 +22,21 @@ Work through each item in order and verify it before moving to the next.
 
 5. **Grouped notifications:** five server push tests and all 15 iOS tests passed. Injected three notifications for distinct conversations and inspected their single iOS group (badge count 3). Conversation destinations and per-message APNs collapse identifiers remain independent. Read/archive/trash/spam actions remove only matching delivered alerts. Production APNs delivery still requires a signed-device check.
 
-6. **Verification-code AutoFill:** native iOS 18+ credential-provider extension, shared configuration, bounded recent-mail endpoint, live revalidation and consumed-code suppression implemented. Enabled it through the actual iOS prompt and filled a Safari verification-code field from its QuickType suggestion. Extraction, expiry, ambiguity, domain matching, and provider errors are covered by native tests. The new server endpoint regression passed. Release scripts/CI now accept separate app and extension profiles and validate both AutoFill and App Group entitlements. Developer Portal setup and a signed-device check remain release prerequisites.
+6. **Verification-code AutoFill:** native iOS 18+ credential-provider extension, shared configuration, bounded recent-mail endpoint, live revalidation and consumed-code suppression implemented. Enabled it through the actual iOS prompt and filled a Safari verification-code field from its QuickType suggestion. Extraction, expiry, ambiguity, domain matching, and provider errors are covered by native tests. The new server endpoint regression passed. Release scripts/CI now accept separate app and extension profiles and validate both AutoFill and App Group entitlements. Developer Portal setup is complete; physical-device verification remains pending.
 
 7. **Final verification:** `npm run check` passed (production web build, 15 web unit tests, Rust formatting, Clippy with warnings denied, and all 55 server tests). All five Playwright end-to-end tests passed against a separate test server/database. All 21 iOS tests passed on iOS 26.5 with Xcode 26.6; an unsigned device Release build also succeeded. Inspected final light/dark inbox, reader and tag sheet, and accessibility extra-large text. Fixed cramped large-text rows and icon sizing. Created a new tag in the native picker, saved it with another tag, and verified both persisted. Confirmed a newly delivered code fills Safari after terminating the host app, using retained domain metadata and a live extension fetch.
 
 Screenshots: `design/implementation/quiet-header-2026-10-24/` (isolated fictional mailbox).
 
-## Before a TestFlight release
+## Release configuration and device follow-up
 
-- [ ] Configure AutoFill Credential Provider and the shared App Group on both Apple Developer identifiers; regenerate the host profile and create the extension profile. Add the new extension profile CI secret. Exact identifiers and filenames are in `ios/README.md`.
+- [x] Configure AutoFill Credential Provider and the shared App Group on both Apple Developer identifiers; regenerate the host profile and create the extension profile. Add the new extension profile CI secret. Validated both profiles for the expected team, bundle IDs, AutoFill entitlement, shared group, App Store distribution and expiry; the host profile also authorizes production APNs. Exact identifiers and filenames are in `ios/README.md`.
 - [ ] Verify production APNs delivery/grouping and badge behavior on the signed build with actual incoming mail.
 - [ ] Enable the provider on a physical iOS 18+ device and verify Safari, another app, Tailscale offline/reconnect behavior, and a subsequent code arriving while Mailthing is closed. New service domains need a host/background identity refresh before QuickType can suggest them; iOS controls background scheduling.
 
-No production deployment, release upload, Apple account configuration, or changes to the production mailbox were performed.
+## Release log — 2026-10-24
+
+- App implementation committed and pushed as `090543844ef1dd08750fffe8b508e5a433396dfe`; all GitHub Checks, iOS Checks and Image workflows passed.
+- Production server deployed through GitOps commit `4f3e53a` with the image built from `0905438`. Argo reported Synced/Healthy and the new pod was Ready. Live health, custom-label settings and bounded AutoFill endpoint checks passed.
+- Created and integrity-checked an online SQLite backup before deployment. Rehearsed the category-removal migration on a copy and verified message, custom-tag and mailbox-state counts were preserved.
+- TestFlight 1.0.5 build `4015501455401` archived, signed, validated and uploaded successfully in [GitHub Actions run 40155014554](https://github.com/ericjohney/mailthing/actions/runs/40155014554). Apple processing is `VALID`, internal status is `IN_BETA_TESTING`, and the build is listed for the internal `Me` group with the owner included. No export-compliance action is pending (`usesNonExemptEncryption: false`).
