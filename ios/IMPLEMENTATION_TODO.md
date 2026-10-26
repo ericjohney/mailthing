@@ -13,6 +13,7 @@ Work through each item in order and verify it before moving to the next.
 - [x] **Header cleanup:** remove the top-right unread filter and its unused state; retain the Unread mailbox. Build, test and inspect both appearances.
 - [x] **Header navigation (version 4):** remove the inbox bottom bar, move Search and Compose to the header, and use the Mailthing logo beside the mailbox title to open the drawer. Verify the controls, both appearances and larger text.
 - [x] **Swipe spacing:** compare both directions on the same conversation, correct button-width differences, and verify edge/inter-button spacing in light and dark mode.
+- [x] **Drawer animation:** record the opening animation, keep the logo moving with the header, and verify both appearances, drawer gestures and mailbox selection.
 
 ## Verification log
 
@@ -39,6 +40,8 @@ Screenshots: `design/implementation/quiet-header-2026-10-24/` (isolated fictiona
 10. **Header navigation:** implemented the selected Header only direction with a 30-point Mailthing logo inside a 44-point drawer button to the left of the mailbox heading. The title is plain text; Search and Compose sit on the right. Removed the inbox dock and its bottom safe-area inset so the list uses the available height. All 21 iOS tests passed. Verified logo → drawer → Unread, header Search → Bookshop result, header Compose → new-message sheet and dismissal, plus light/dark appearance and accessibility extra-large text. Screenshots: `design/implementation/header-navigation-2026-10-25/` (fictional mailbox). Included in TestFlight 1.0.5 build `4026030198101`.
 
 11. **Swipe spacing:** compared both directions on the same read conversation in a separate iPhone 17 Pro simulator. The long Mark unread label made both leading buttons 76 points wide while trailing buttons were 50 points wide; edge and inter-button spacing already matched. Changed the visible labels to Read/Unread and retained Mark read/Mark unread for accessibility. Updated 1× screenshots show identical 50×49-pixel painted bounds, 10-pixel gaps and 10-pixel outer insets in both directions and appearances. Verified both read-state actions through the UI and their full accessibility labels. All 21 iOS tests passed. Actual screenshots and an interactive before/after comparison are in `design/implementation/swipe-spacing-2026-10-25/`. Included in TestFlight 1.0.5 build `4026030198101`.
+
+12. **Drawer animation:** recorded the logo trailing the Inbox heading during drawer opening. Added a geometry group to the moving inbox container so SwiftUI does not push the slide into independently animated button labels. Retained the original spring, direct drag tracking and Reduce Motion handling. Recorded and inspected opening/closing frame by frame in light and dark mode; verified edge swipe to open, left swipe to close, tap outside to close and selecting Unread/Inbox. All 21 iOS tests passed on the isolated iOS 26.5 simulator with Xcode 26.6. Normal-speed clips and a half-speed before/after comparison are in `design/implementation/drawer-animation-2026-10-25/` (fictional mailbox). This fix is not included in TestFlight build `4026030198101`.
 
 ## Release configuration and device follow-up
 

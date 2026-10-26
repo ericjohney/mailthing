@@ -40,6 +40,9 @@ struct InboxView: View {
                                 .accessibilityLabel("Close mailbox menu")
                             }
                         }
+                        // Keep the slide on this container instead of pushing
+                        // its geometry into independently animated button labels.
+                        .geometryGroup()
                         .shadow(color: .black.opacity(offset > 0 ? 0.16 : 0), radius: 18, x: -5)
                         .offset(x: offset)
                     if !sidebar {
