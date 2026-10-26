@@ -16,4 +16,7 @@ appearances. Verified opening by the logo and edge swipe, closing by tapping the
 exposed inbox and swiping left, and selecting Unread then Inbox. All 21 native
 tests passed using Xcode 26.6; the test host used an unavailable loopback server.
 
-The shipped TestFlight build `4026030198101` predates this fix.
+Released in TestFlight 1.0.5 build `4026577096101` from app commit
+`7b61414696f10f5ee796f4422e5614c376286092`. Apple processing and availability
+for the internal `Me` group were verified after
+[release run 40265770961](https://github.com/ericjohney/mailthing/actions/runs/40265770961).
