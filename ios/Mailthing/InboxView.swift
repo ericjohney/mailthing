@@ -191,7 +191,9 @@ struct InboxView: View {
                     }
                 }
                 .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
+                    // Let the confirmed data update remove the row. A destructive
+                    // role makes List remove it before this async action finishes.
+                    Button {
                         Task { await store.action(thread.id, "trash") }
                     } label: {
                         Label("Trash", systemImage: "trash.fill")
@@ -217,6 +219,7 @@ struct InboxView: View {
         }
         .listStyle(.plain).scrollContentBackground(.hidden).background(Color.mailCanvas)
         .contentMargins(.top, 0, for: .scrollContent)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: store.threads.map(\.id))
         .refreshable { await store.refresh() }
         .overlay { if store.threads.isEmpty && !store.loading && store.error == nil { emptyState } }
     }
