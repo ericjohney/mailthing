@@ -18,4 +18,9 @@ visible, an error appeared, and its server membership was preserved. Restored
 the server and fictional mailbox after checking both paths.
 
 All 21 native tests passed with Xcode 26.6. The test host used an unavailable
-loopback server. This change is not in TestFlight build `4026577096101`.
+loopback server.
+
+Released in TestFlight 1.0.5 build `4044209110601` from app commit
+`de09272422dc401a244e7e3354999b3e9a6a9a45`. Apple processing and availability
+for the internal `Me` group were verified after
+[release run 40442091106](https://github.com/ericjohney/mailthing/actions/runs/40442091106).
