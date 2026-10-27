@@ -1,0 +1,19 @@
+{
+  "before": {
+    "samples": 233,
+    "backwardSteps": [
+      {
+        "time": 2.233,
+        "from": 283,
+        "to": 0
+      }
+    ],
+    "largestBackwardStep": 283
+  },
+  "after": {
+    "samples": 155,
+    "backwardSteps": [],
+    "largestBackwardStep": 0
+  },
+  "method": "Track inbox leading edge at y=65 points in dark-mode recordings, sampled at 60fps on the 402-point-wide simulator. Ignore backward differences of 2 pixels or less as compression noise."
+}

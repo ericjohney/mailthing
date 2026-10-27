@@ -50,7 +50,9 @@ Tap a PDF or image attachment to open the native Quick Look preview with zoom,
 PDF page browsing, and sharing. Other files open the share sheet. Files load from
 your mailbox server and temporary preview files are removed on dismissal.
 
-Settings groups notifications, sorting, appearance, connection, and app details.
+Settings slides in from the right as a full page. Use Back or swipe from the
+left edge to return to the previous page; returning to mail keeps the selected
+mailbox. Settings groups notifications, sorting, appearance, connection, and app details.
 Notification controls show actual iOS permission state rather than a simulated
 app switch. System, light, and dark themes use adaptive monochrome controls;
 text uses Dynamic Type and icon controls provide at least 44-point targets.

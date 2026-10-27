@@ -2,48 +2,40 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: MailStore
-    @Environment(\.dismiss) private var dismiss
     @AppStorage("appearance") private var appearance = "system"
     var body: some View {
-        NavigationStack {
-            Form {
-                Section { MailAccountCard(account: store.settings?.account) }
-                Section("Preferences") {
-                    NavigationLink { NotificationSettingsView() } label: {
-                        Label { HStack { Text("New mail notifications"); Spacer(); Text(store.notifications == "Enabled" ? "Enabled" : "Off").font(.caption).foregroundStyle(.secondary) } } icon: { Image(systemName: "bell").foregroundStyle(.secondary) }
-                    }
-                    NavigationLink { MailSortingSettingsView() } label: {
-                        Label { HStack { Text("Mail sorting"); Spacer(); Text(store.settings?.sortingConfigured == true ? "Configured" : "Not configured").font(.caption).foregroundStyle(.secondary) } } icon: { Image(systemName: "tag").foregroundStyle(.secondary) }
-                    }
-                    NavigationLink { SortingMemoryView() } label: { Label("Sorting memory", systemImage: "doc.text").foregroundStyle(.primary) }
+        Form {
+            Section { MailAccountCard(account: store.settings?.account) }
+            Section("Preferences") {
+                NavigationLink { NotificationSettingsView() } label: {
+                    Label { HStack { Text("New mail notifications"); Spacer(); Text(store.notifications == "Enabled" ? "Enabled" : "Off").font(.caption).foregroundStyle(.secondary) } } icon: { Image(systemName: "bell").foregroundStyle(.secondary) }
                 }
-                Section {
-                    NavigationLink { CodeAutoFillSettingsView() } label: { Label("Verification-code AutoFill", systemImage: "key").foregroundStyle(.primary) }
+                NavigationLink { MailSortingSettingsView() } label: {
+                    Label { HStack { Text("Mail sorting"); Spacer(); Text(store.settings?.sortingConfigured == true ? "Configured" : "Not configured").font(.caption).foregroundStyle(.secondary) } } icon: { Image(systemName: "tag").foregroundStyle(.secondary) }
                 }
-                Section("Appearance") {
-                    Picker("Theme", selection: $appearance) {
-                        Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark")
-                    }.pickerStyle(.segmented)
-                }
-                Section("Connection") {
-                    NavigationLink { ServerSettingsView() } label: { Label("Mail server", systemImage: "network").foregroundStyle(.primary) }
-                }
-                Section("About") {
-                    LabeledContent("Version", value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"))")
-                    LabeledContent("Sending", value: store.settings?.outboundConfigured == true ? "Configured" : "Not configured")
-                    Text("Mailbox identity, filters, and labels can be managed in Mailthing on the web.").font(.caption).foregroundStyle(.secondary)
-                }
+                NavigationLink { SortingMemoryView() } label: { Label("Sorting memory", systemImage: "doc.text").foregroundStyle(.primary) }
             }
-            .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                MailHeader {
-                    MailIconButton(symbol: "xmark", label: "Close settings") { dismiss() }
-                    Text("Settings").font(.headline)
-                    Spacer()
-                }
+            Section {
+                NavigationLink { CodeAutoFillSettingsView() } label: { Label("Verification-code AutoFill", systemImage: "key").foregroundStyle(.primary) }
             }
-            .task { await store.notificationStatus() }
+            Section("Appearance") {
+                Picker("Theme", selection: $appearance) {
+                    Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark")
+                }.pickerStyle(.segmented)
+            }
+            Section("Connection") {
+                NavigationLink { ServerSettingsView() } label: { Label("Mail server", systemImage: "network").foregroundStyle(.primary) }
+            }
+            Section("About") {
+                LabeledContent("Version", value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"))")
+                LabeledContent("Sending", value: store.settings?.outboundConfigured == true ? "Configured" : "Not configured")
+                Text("Mailbox identity, filters, and labels can be managed in Mailthing on the web.").font(.caption).foregroundStyle(.secondary)
+            }
         }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .task { await store.notificationStatus() }
         .tint(.mailAction)
         .preferredColorScheme(appearance == "system" ? nil : appearance == "dark" ? .dark : .light)
     }

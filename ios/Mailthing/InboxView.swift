@@ -4,7 +4,8 @@ struct InboxView: View {
     @EnvironmentObject private var store: MailStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sidebar = false
-    @GestureState private var drawerDrag: CGFloat = 0
+    @State private var drawerDrag: CGFloat = 0
+    @GestureState private var draggingDrawer = false
     @State private var showSettings = false
     @State private var compose: Draft?
     @State private var tags: TagTarget?
@@ -57,11 +58,14 @@ struct InboxView: View {
                 .clipped()
                 .simultaneousGesture(sidebar ? drawerGesture(panelWidth: panelWidth) : nil)
                 .accessibilityAction(.escape) { setSidebar(false) }
+                .onChange(of: draggingDrawer) { _, dragging in
+                    if !dragging && drawerDrag != 0 { setSidebar(sidebar) }
+                }
             }
             .background(Color.mailCanvas.ignoresSafeArea())
             .navigationDestination(for: String.self) { ConversationView(id: $0) }
+            .navigationDestination(isPresented: $showSettings) { SettingsView() }
             .sheet(item: $tags) { target in TagPicker(threadID: target.id) }
-            .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(item: $compose, onDismiss: { Task { await store.refresh() } }) { ComposeView(initial: $0) }
             .task(id: "\(store.label)|\(store.search)") {
                 do {
@@ -96,16 +100,23 @@ struct InboxView: View {
         searching = false
         withAnimation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.9)) {
             sidebar = open
+            // Commit the drag reset with the destination so the slide continues
+            // from the finger position instead of jumping to the starting edge.
+            drawerDrag = 0
         }
     }
     private func drawerGesture(panelWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 12)
-            .updating($drawerDrag) { value, state, _ in
+            .updating($draggingDrawer) { _, state, _ in state = true }
+            .onChanged { value in
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                state = value.translation.width
+                drawerDrag = value.translation.width
             }
             .onEnded { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                guard abs(value.translation.width) > abs(value.translation.height) else {
+                    setSidebar(sidebar)
+                    return
+                }
                 let destination = (sidebar ? panelWidth : 0) + value.predictedEndTranslation.width
                 setSidebar(destination > panelWidth / 2)
             }
