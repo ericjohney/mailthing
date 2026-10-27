@@ -14,4 +14,7 @@ subpage and Settings itself, and preservation of the selected Unread mailbox.
 Checked the appearance picker and restored System theme. All 21 native tests
 passed with Xcode 26.6 using an unavailable loopback server for the test host.
 
-This change is not in TestFlight build `4044209110601`.
+Released in TestFlight 1.0.5 build `4044637751701` from app commit
+`5d2102dd82de498303674354149ff44f2dde0dc9`. Apple processing and availability
+for the internal `Me` group were verified after
+[release run 40446377517](https://github.com/ericjohney/mailthing/actions/runs/40446377517).
