@@ -20,7 +20,7 @@ struct TagChips: View {
                 }
             }
         }.accessibilityElement(children: .combine)
-            .accessibilityLabel("Tags: \(labels.map(\.name).joined(separator: ", "))")
+            .accessibilityLabel("Labels: \(labels.map(\.name).joined(separator: ", "))")
     }
 }
 
@@ -48,7 +48,7 @@ struct TagPicker: View {
                         if !loaded { Button("Retry") { Task { await load() } } }
                     }
                 }
-                if !loaded && error == nil { ProgressView("Loading tags…") }
+                if !loaded && error == nil { ProgressView("Loading labels…") }
                 ForEach(matches) { label in
                     Button {
                         if !selected.insert(label.id).inserted { selected.remove(label.id) }
@@ -63,17 +63,17 @@ struct TagPicker: View {
                         .accessibilityValue(selected.contains(label.id) ? "Selected" : "Not selected")
                 }
                 if loaded && labels.isEmpty && name.isEmpty {
-                    Text("Create a tag for projects, receipts, or anything you want to find later.")
+                    Text("Create a label for projects, receipts, or anything you want to find later.")
                         .foregroundStyle(.secondary).font(.callout)
                 }
                 if loaded && !name.isEmpty && !labels.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
                     Button { Task { await create() } } label: { Label("Create “\(name)”", systemImage: "plus") }
                         .disabled(busy || name.utf8.count > 50)
-                    if name.utf8.count > 50 { Text("Choose a shorter tag name.").font(.caption).foregroundStyle(.secondary) }
+                    if name.utf8.count > 50 { Text("Choose a shorter label name.").font(.caption).foregroundStyle(.secondary) }
                 }
             }
-            .searchable(text: $search, prompt: "Find or create a tag")
-            .navigationTitle("Tags").navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $search, prompt: "Find or create a label")
+            .navigationTitle("Labels").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(busy) }
                 ToolbarItem(placement: .confirmationAction) {

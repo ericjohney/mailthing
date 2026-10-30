@@ -24,10 +24,10 @@ struct ConversationView: View {
                         .font(.title2.weight(.semibold)).padding(.top, 12)
                     let labels = conversation.labels.filter { $0.kind == "user" }
                     Button { showTags = true } label: {
-                        if labels.isEmpty { Label("Add tags", systemImage: "tag").font(.caption) }
+                        if labels.isEmpty { Label("Add labels", systemImage: "tag").font(.caption) }
                         else { TagChips(labels: labels) }
                     }.buttonStyle(.plain).foregroundStyle(.secondary)
-                        .accessibilityLabel(labels.isEmpty ? "Add tags" : "Edit tags, \(labels.map(\.name).joined(separator: ", "))")
+                        .accessibilityLabel(labels.isEmpty ? "Add labels" : "Edit labels, \(labels.map(\.name).joined(separator: ", "))")
                     ForEach(conversation.messages) { message in
                         VStack(alignment: .leading, spacing: 14) {
                             messageHeading(message)
@@ -103,7 +103,7 @@ struct ConversationView: View {
             MailIconButton(symbol: "archivebox", label: "Archive conversation") { Task { await move("archive") } }
                 .disabled(conversation == nil)
             Spacer(minLength: 0)
-            MailIconButton(symbol: "tag", label: "Edit tags") { showTags = true }.disabled(conversation == nil)
+            MailIconButton(symbol: "tag", label: "Edit labels") { showTags = true }.disabled(conversation == nil)
             Spacer(minLength: 0)
             Button {
                 if let message = latestMessage { compose = Draft.reply(to: message) }
@@ -133,7 +133,7 @@ struct ConversationView: View {
             Button("Snooze until tomorrow", systemImage: "clock") {
                 Task { await store.action(id, "snooze", until: Int64(Date().addingTimeInterval(86400).timeIntervalSince1970 * 1000)); if store.error == nil { dismiss() } }
             }
-            Button("Tags", systemImage: "tag") { showTags = true }
+            Button("Labels", systemImage: "tag") { showTags = true }
         } label: {
             Image(systemName: "ellipsis").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
         }.foregroundStyle(Color.mailAction).accessibilityLabel("More conversation actions").disabled(conversation == nil)

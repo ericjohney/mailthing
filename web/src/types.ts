@@ -8,6 +8,12 @@ export interface Label {
   color: string;
   /** System labels (INBOX, STARRED, SPAM, ...) are built in. */
   kind: 'system' | 'user';
+  /** Older servers did not send pins; existing labels stay visible. */
+  pinned?: boolean;
+}
+export interface LabelDetail extends Label {
+  guidance: string;
+  example_count: number;
 }
 export interface Settings {
   account: Account;

@@ -29,6 +29,157 @@ async fn request(app: &Router, method: &str, path: &str, data: Value) -> (Status
 }
 
 #[tokio::test]
+async fn label_management_persists_pins_and_updates_guidance_without_losing_mail_or_examples() {
+    let (_temp, state) = setup().await;
+    let thread = deliver(
+        &state,
+        mail("Project notes", "label-edit", "Plans for the team"),
+    )
+    .await;
+    let app = api::router(state.clone());
+    let mut events = state.events.subscribe();
+    let (status, label) = request(
+        &app,
+        "POST",
+        "/api/labels",
+        json!({"name":" Work ","color":"#777d88"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(label["pinned"], true);
+    assert_eq!(label["name"], "Work");
+    events.try_recv().unwrap();
+    let path = format!("/api/labels/{}", label["id"].as_str().unwrap());
+    assert_eq!(
+        request(
+            &app,
+            "POST",
+            "/api/actions",
+            json!({"thread_ids":[thread],"action":"label","value":label["id"]})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let detail = request(&app, "GET", &path, json!(null)).await.1;
+    assert_eq!(detail["guidance"], "");
+    assert_eq!(detail["example_count"], 1);
+    let update = json!({"name":" Projects ","color":"#879988","pinned":false,"guidance":" Team discussions "});
+    assert_eq!(
+        request(&app, "PUT", &path, update.clone()).await.0,
+        StatusCode::OK
+    );
+    let detail = request(&app, "GET", &path, json!(null)).await.1;
+    assert_eq!(detail["name"], "Projects");
+    assert_eq!(detail["color"], "#879988");
+    assert_eq!(detail["pinned"], false);
+    assert_eq!(detail["guidance"], "Team discussions");
+    assert_eq!(detail["example_count"], 1);
+    let settings = request(&app, "GET", "/api/settings", json!(null)).await.1;
+    let shared = settings["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["id"] == label["id"])
+        .unwrap();
+    assert_eq!(shared["pinned"], false);
+    let conversation = request(&app, "GET", &format!("/api/threads/{thread}"), json!(null))
+        .await
+        .1;
+    assert!(
+        conversation["labels"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|l| l["id"] == label["id"] && l["name"] == "Projects")
+    );
+    for invalid in [
+        json!({"name":"inbox"}),
+        json!({"name":""}),
+        json!({"name":"a\nb"}),
+        json!({"name":"é".repeat(26)}),
+        json!({"color":"#gggggg"}),
+        json!({"guidance":"x".repeat(2001)}),
+    ] {
+        let mut body = update.clone();
+        for (key, value) in invalid.as_object().unwrap() {
+            body[key] = value.clone();
+        }
+        assert_eq!(
+            request(&app, "PUT", &path, body).await.0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    assert_eq!(request(&app, "GET", &path, json!(null)).await.1, detail);
+    assert_eq!(
+        request(&app, "PUT", "/api/labels/INBOX", update.clone())
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        request(&app, "PUT", "/api/labels/missing", update).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        request(&app, "GET", "/api/labels/INBOX", json!(null))
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        request(
+            &app,
+            "PUT",
+            &path,
+            json!({"name":"Projects","color":"#879988","pinned":true})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        request(&app, "GET", &path, json!(null)).await.1["guidance"],
+        "Team discussions"
+    );
+    sqlx::query("INSERT INTO rules(id,name,field,contains,action,value) VALUES('label-rule','Projects','from','team','label',?)")
+        .bind(label["id"].as_str().unwrap()).execute(&state.pool).await.unwrap();
+    assert_eq!(
+        request(&app, "DELETE", &path, json!(null)).await.0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        request(&app, "GET", &path, json!(null)).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let conversation = request(&app, "GET", &format!("/api/threads/{thread}"), json!(null))
+        .await
+        .1;
+    assert_eq!(conversation["messages"].as_array().unwrap().len(), 1);
+    assert!(
+        !conversation["labels"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|l| l["id"] == label["id"])
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM rules WHERE id='label-rule'")
+            .fetch_one(&state.pool)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sorting_examples")
+            .fetch_one(&state.pool)
+            .await
+            .unwrap(),
+        0
+    );
+}
+
+#[tokio::test]
 async fn restores_legacy_html_from_raw_without_mutating_or_exposing_raw_mail() {
     let (_temp, state) = setup().await;
     let raw = b"From: Sam <sam@example.net>\r\nSubject: A saved offer\r\nContent-Type: text/html\r\n\r\n<div style=\"display:none\">hidden padding</div><table width=\"600\"><tr><td style=\"color:red\">Offer<img src=\"https://images.example/item.png\"></td></tr></table>".to_vec();

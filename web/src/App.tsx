@@ -31,6 +31,7 @@ import {
 import { api, messageDate, mutate } from './api';
 import { Compose } from './Compose';
 import { Conversation } from './Conversation';
+import { LabelsView, type LabelChange } from './LabelManagement';
 import { Settings } from './Settings';
 import {
   emptyDraft,
@@ -75,6 +76,7 @@ export function App() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [compose, setCompose] = useState<Draft>();
   const [settingsTab, setSettingsTab] = useState<string>();
+  const [labelsView, setLabelsView] = useState<{ create: boolean }>();
   const [help, setHelp] = useState(false);
   const [sidebar, setSidebar] = useState(false);
   const [compactNavigation, setCompactNavigation] = useState(false);
@@ -97,6 +99,7 @@ export function App() {
   const [connected, setConnected] = useState(true);
   const searchInput = useRef<HTMLInputElement>(null);
   const refresh = useCallback(() => setTick((old) => old + 1), []);
+  const closeSidebar = useCallback(() => setSidebar(false), []);
   useEffect(() => setSidebar(false), [mobile]);
   const report = useCallback((message: string) => setToast(message), []);
   const navigate = useCallback((next: Route) => {
@@ -286,11 +289,12 @@ export function App() {
         event.preventDefault();
         searchInput.current?.focus();
       }
-      if (compose || settingsTab) return;
+      if (compose || settingsTab || labelsView) return;
       if (event.key === 'c') setCompose(emptyDraft());
       if (event.key === 'e') doAction('archive');
       if (event.key === '#') doAction('trash');
       if (event.key === 'Escape') {
+        setSidebar(false);
         setDropdown(undefined);
         if (route.thread) navigate({ label: route.label });
       }
@@ -299,6 +303,28 @@ export function App() {
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
   });
+  const labelChanged: LabelChange = (label, deleted) => {
+    setSettings((current) =>
+      current
+        ? {
+            ...current,
+            labels: deleted
+              ? current.labels.filter((item) => item.id !== label.id)
+              : [...current.labels.filter((item) => item.id !== label.id), label],
+          }
+        : current,
+    );
+    if (deleted && route.label === label.id) {
+      setQuery('');
+      navigate({ label: 'INBOX' });
+    }
+    refresh();
+  };
+  function openLabels(create = false) {
+    setSidebar(false);
+    setDropdown(undefined);
+    setLabelsView({ create });
+  }
   function toggle(id: string) {
     setSelected((old) => {
       const next = new Set(old);
@@ -329,7 +355,7 @@ export function App() {
 
   return (
     <div className={`app-shell ${compactNavigation ? 'navigation-compact' : ''}`}>
-      <header className="app-header">
+      <header className="app-header" inert={mobile && sidebar}>
         <div className="header-brand">
           <IconButton
             label="Toggle navigation"
@@ -491,9 +517,16 @@ export function App() {
           setCompose(emptyDraft());
           setSidebar(false);
         }}
-        onSettings={setSettingsTab}
+        onSettings={(tab) => {
+          setSidebar(false);
+          setSettingsTab(tab);
+        }}
+        onManageLabels={() => openLabels()}
+        onCreateLabel={() => openLabels(true)}
+        onClose={closeSidebar}
+        mobile={mobile}
       />
-      <main className="mail-panel" aria-label="Mailbox">
+      <main className="mail-panel" aria-label="Mailbox" inert={mobile && sidebar}>
         {route.thread ? (
           <>
             {loadError ? (
@@ -684,7 +717,7 @@ export function App() {
                         ))}
                         <button
                           onClick={() => {
-                            setSettingsTab('labels');
+                            openLabels(true);
                             setDropdown(undefined);
                           }}
                         >
@@ -880,10 +913,29 @@ export function App() {
       {settingsTab && (
         <Settings
           settings={settings}
+          onLabelChange={labelChanged}
+          onOpenLabel={(label) => {
+            setSettingsTab(undefined);
+            setQuery('');
+            navigate({ label: label.id });
+          }}
           initialTab={settingsTab}
           onClose={() => setSettingsTab(undefined)}
           refresh={refresh}
           report={report}
+        />
+      )}
+      {labelsView && (
+        <LabelsView
+          settings={settings}
+          initialCreate={labelsView.create}
+          onChanged={labelChanged}
+          onOpen={(label) => {
+            setLabelsView(undefined);
+            setQuery('');
+            navigate({ label: label.id });
+          }}
+          onClose={() => setLabelsView(undefined)}
         />
       )}
       {help && (

@@ -38,7 +38,7 @@ To add an optional collection of fictional example messages to a local instance,
 - One inbox, with custom tags for organizing mail.
 - Gmail-style labels instead of folders: a conversation can carry any number of labels, and archiving simply removes Inbox.
 - Stars, importance, read/unread, archive, snooze, Spam, Trash, and permanent deletion from Trash.
-- Custom labels and ordered filters configured in Settings.
+- Create, edit, color, and pin custom labels from the mailbox drawer on iOS and mobile web; ordered filters remain in Settings.
 - Compose, reply, reply-all, forward, Cc/Bcc, attachments, and durable drafts.
 - Full-text search, bulk actions, pagination, live updates, keyboard shortcuts, and mobile layouts.
 - Crisp monochrome appearance with light, dark, and device-following themes.
@@ -130,6 +130,21 @@ All mailbox state is stored as labels on individual messages, following Gmail's 
 - **Trash** and **Spam** add their label and remove `INBOX`. Your own labels are kept but hidden until the conversation is moved back to the inbox.
 - **Snooze** swaps `INBOX` for `SNOOZED`, and the server adds `INBOX` back when the snooze ends.
 - Sent mail carries only `SENT`, so replying never moves a conversation.
+
+The drawer puts Inbox, Unread, and Starred first, followed by pinned custom labels,
+**Manage**, **New label**, and **All labels**. The remaining mailboxes live under
+**More mailboxes**. Manage opens a searchable label list with conversation counts;
+edit a label to rename it, choose its color, pin/unpin it, or add sorting guidance.
+Unpinned labels remain available in All labels and message label pickers. Existing
+labels stay pinned after upgrading. Deleting a label requires confirmation and
+keeps its messages; associated sorting memory and label filters are removed.
+Pins and edits sync through the server across both clients.
+
+`GET /api/labels/{id}` returns a custom label with its guidance and example count.
+`PUT /api/labels/{id}` atomically saves `name`, `color`, `pinned`, and optional
+`guidance`. Omitting guidance preserves it. Creation accepts these same fields;
+`pinned` defaults to true for older clients. Label names accept up to 50 UTF-8
+bytes; guidance accepts up to 2,000 Unicode scalar characters.
 
 System labels can't be renamed, deleted, or shadowed by a user label with the same name.
 

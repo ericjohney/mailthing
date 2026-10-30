@@ -50,6 +50,7 @@ test('receives mail through the pipeline, supports mailbox actions, and works on
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Toggle navigation' }).click();
+  await page.getByRole('button', { name: 'More mailboxes' }).click();
   await page.getByRole('button', { name: 'Drafts', exact: true }).click();
   await expect(page.getByText('Re: A note for the weekend', { exact: true })).toBeVisible();
   await page.getByText('Re: A note for the weekend', { exact: true }).click();

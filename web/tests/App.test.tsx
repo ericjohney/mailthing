@@ -199,7 +199,7 @@ it('offers Not spam for selected conversations in the Spam view', async () => {
     </ThemeProvider>,
   );
   await screen.findByText('Weekend plans');
-  await user.click(screen.getByRole('button', { name: 'More' }));
+  await user.click(screen.getByRole('button', { name: 'More mailboxes' }));
   await user.click(screen.getByRole('button', { name: 'Spam' }));
   await user.click(screen.getByRole('checkbox', { name: 'Select Weekend plans' }));
   await user.click(screen.getByRole('button', { name: 'Mark selected as not spam' }));

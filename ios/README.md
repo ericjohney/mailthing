@@ -23,19 +23,27 @@ The app never presents invented messages as mailbox data.
 ## Interface
 
 The quiet header shows the Mailthing logo, current mailbox and unread count, with
-Search and Compose on the right. Tap the logo to open folders and custom tags;
+Search and Compose on the right. Tap the logo to open mailboxes and labels;
 choose Unread to see only unread mail. The inbox has no bottom bar, leaving more
 space for messages. The mailbox panel slides in;
 selecting a mailbox or swiping left closes it. Built-in inbox categories have been
 removed from both clients and automatic sorting. Existing mail and custom tags are
 preserved by migration 0007.
 
-Message rows show local sender initials, unread indicators, and custom tag chips.
-Swipe right and choose Tags, or long-press a row and choose Tags, to select multiple
-tags or create one. The reader offers
-an Add tags control under the subject and a tag button in its bottom action dock.
-Save applies the complete custom-tag selection atomically; Cancel leaves it unchanged.
-Swipe right for blue Read/Unread and amber Tags actions; swipe left for teal Archive
+The drawer puts Inbox, Unread, and Starred above Labels. Manage opens a searchable
+list with conversation counts; New label creates a label without leaving iOS.
+Edit a label to rename it, choose a color, pin it to the drawer, and add sorting
+guidance. All labels includes unpinned labels. Remaining mailboxes are under
+More mailboxes. Deleting a label requires confirmation and keeps its messages.
+Label edits and pins are shared with the web app; existing labels stay pinned
+when upgrading.
+
+Message rows show local sender initials, unread indicators, and custom label chips.
+Swipe right and choose Labels, or long-press a row and choose Labels, to select multiple
+labels or create one. The reader offers
+an Add labels control under the subject and a tag button in its bottom action dock.
+Save applies the complete custom-label selection atomically; Cancel leaves it unchanged.
+Swipe right for blue Read/Unread and amber Labels actions; swipe left for teal Archive
 and coral Trash. Each action has an icon and a label. Read/unread and star actions
 are also available by long-pressing a conversation.
 Short swipe labels keep the native button widths consistent in both directions;
@@ -76,7 +84,7 @@ processed mail. Applying/removing labels teaches custom-label memory. **Report
 spam / Not spam** in the conversation menu teaches Spam memory; moving existing
 spam to Inbox also teaches a not-spam correction. Automatic predictions never
 teach themselves. A new label becomes eligible for automatic sorting once it
-has guidance or positive examples. Create tags from the mobile tag picker or web app; manage deterministic filters on
+has guidance or positive examples. Create and manage labels from the drawer, or create them from the message label picker; manage deterministic filters on
 the web app. Model, connection credentials and spam cutoff remain configured
 on the server; the mobile app never receives provider credentials.
 

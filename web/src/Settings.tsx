@@ -14,6 +14,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { api, encodeFile, mutate } from './api';
+import { LabelManagement, type LabelChange } from './LabelManagement';
 import { userLabels } from './mailbox/navigation';
 import type { PipelineStatus, Rule, SortingMemory, Settings as SettingsData } from './types';
 import {
@@ -33,18 +34,20 @@ export function Settings({
   onClose,
   refresh,
   report,
+  onLabelChange,
+  onOpenLabel,
 }: {
   settings: SettingsData;
   initialTab?: string;
   onClose: () => void;
   refresh: () => void;
   report: (message: string) => void;
+  onLabelChange?: LabelChange;
+  onOpenLabel?: (label: import('./types').Label) => void;
 }) {
   const [tab, setTab] = useState(initialTab);
   const [account, setAccount] = useState(settings.account);
   const labels = userLabels(settings.labels);
-  const [labelName, setLabelName] = useState('');
-  const [color, setColor] = useState('#65705f');
   const [rules, setRules] = useState<Rule[]>([]);
   const [memories, setMemories] = useState<SortingMemory[]>([]);
   const [pipeline, setPipeline] = useState<PipelineStatus>();
@@ -179,60 +182,11 @@ export function Settings({
           </>
         )}
         {tab === 'labels' && (
-          <>
-            <SectionHeading
-              title="Keep everything in its place"
-              description="Create labels, then apply them to conversations or use them in a filter."
-            />
-            <form
-              className="inline-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                run(async () => {
-                  await mutate('/labels', { name: labelName, color });
-                  setLabelName('');
-                }, 'Label created');
-              }}
-            >
-              <input
-                aria-label="New label name"
-                placeholder="Label name"
-                required
-                value={labelName}
-                onChange={(event) => setLabelName(event.target.value)}
-                maxLength={50}
-              />
-              <input
-                type="color"
-                aria-label="Label color"
-                value={color}
-                onChange={(event) => setColor(event.target.value)}
-              />
-              <Button variant="primary" type="submit" disabled={saving}>
-                <Plus size={17} />
-                Create
-              </Button>
-            </form>
-            <div className="settings-list">
-              {labels.map((label) => (
-                <div key={label.id}>
-                  <span className="label-dot" style={{ background: label.color }} />
-                  <strong>{label.name}</strong>
-                  <IconButton
-                    label={`Delete label ${label.name}`}
-                    onClick={() =>
-                      run(() => api(`/labels/${label.id}`, { method: 'DELETE' }), 'Label deleted')
-                    }
-                  >
-                    <Trash2 size={16} />
-                  </IconButton>
-                </div>
-              ))}
-              {labels.length === 0 && (
-                <p className="muted">No labels yet. Create your first one above.</p>
-              )}
-            </div>
-          </>
+          <LabelManagement
+            settings={settings}
+            onChanged={onLabelChange ?? (() => refresh())}
+            onOpen={onOpenLabel ?? (() => onClose())}
+          />
         )}
         {tab === 'sorting' && (
           <>

@@ -14,6 +14,7 @@
 		20169C7B96C445936B5507FD /* MailthingAutoFill.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BEDC4750C27A78C1352A2907 /* MailthingAutoFill.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		24A4C210255FE92BB771C06E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A2D5934F17924A85AECF69 /* SettingsView.swift */; };
 		3826AFFD3943846FECE16A63 /* CodeAutoFill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F91841BF5E6466090A679F /* CodeAutoFill.swift */; };
+		403BC5E5D7367FAF97EE7838 /* LabelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056FA765DAB7FCB6B74B4218 /* LabelsView.swift */; };
 		498DEF5AC7B58BFB0B34ABC1 /* MailNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AA26E511F341259662B29F1 /* MailNotifications.swift */; };
 		4FD0557CAFD37C711039DDFB /* MailthingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C322426BBCAA9F44D9D12C7 /* MailthingTests.swift */; };
 		50311835915BE04C7470E45E /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08B856F8015DA04E424C08B0 /* ConversationView.swift */; };
@@ -60,6 +61,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		056FA765DAB7FCB6B74B4218 /* LabelsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelsView.swift; sourceTree = "<group>"; };
 		08B856F8015DA04E424C08B0 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
 		0C322426BBCAA9F44D9D12C7 /* MailthingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailthingTests.swift; sourceTree = "<group>"; };
 		1513F560325D8AAD13C7CC85 /* ComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeView.swift; sourceTree = "<group>"; };
@@ -136,6 +138,7 @@
 				08B856F8015DA04E424C08B0 /* ConversationView.swift */,
 				72F08A0474DF0C96DC9E0E94 /* InboxView.swift */,
 				8ACAB084DC3CE91A4832267A /* Info.plist */,
+				056FA765DAB7FCB6B74B4218 /* LabelsView.swift */,
 				154004C8C40C460F0945D17C /* MailDesign.swift */,
 				6AA26E511F341259662B29F1 /* MailNotifications.swift */,
 				B01E41E891069A052BFB5B02 /* MailStore.swift */,
@@ -295,6 +298,7 @@
 				5E2B4E04B141644E1E1501BC /* ComposeView.swift in Sources */,
 				50311835915BE04C7470E45E /* ConversationView.swift in Sources */,
 				BC118B2CCDC6218028469C7E /* InboxView.swift in Sources */,
+				403BC5E5D7367FAF97EE7838 /* LabelsView.swift in Sources */,
 				0DEA2CCCEE1539AB628D0193 /* MailDesign.swift in Sources */,
 				498DEF5AC7B58BFB0B34ABC1 /* MailNotifications.swift in Sources */,
 				5A48DE1A5726755A18B55AD8 /* MailStore.swift in Sources */,

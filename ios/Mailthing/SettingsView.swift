@@ -7,6 +7,7 @@ struct SettingsView: View {
         Form {
             Section { MailAccountCard(account: store.settings?.account) }
             Section("Preferences") {
+                NavigationLink { LabelsView() } label: { Label("Labels", systemImage: "tag").foregroundStyle(.primary) }
                 NavigationLink { NotificationSettingsView() } label: {
                     Label { HStack { Text("New mail notifications"); Spacer(); Text(store.notifications == "Enabled" ? "Enabled" : "Off").font(.caption).foregroundStyle(.secondary) } } icon: { Image(systemName: "bell").foregroundStyle(.secondary) }
                 }
@@ -29,7 +30,7 @@ struct SettingsView: View {
             Section("About") {
                 LabeledContent("Version", value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"))")
                 LabeledContent("Sending", value: store.settings?.outboundConfigured == true ? "Configured" : "Not configured")
-                Text("Mailbox identity, filters, and labels can be managed in Mailthing on the web.").font(.caption).foregroundStyle(.secondary)
+                Text("Mailbox identity and filters can be managed in Mailthing on the web.").font(.caption).foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Settings")
@@ -127,7 +128,7 @@ struct SortingMemoryView: View {
             memorySection("Spam detection", items: memories.filter(\.isSpam))
             if loaded && memories.filter({ $0.kind == "user" }).isEmpty {
                 Section("Labels") {
-                    Text("Create labels in Mailthing on the web, then add sorting guidance here.").foregroundStyle(.secondary)
+                    NavigationLink("Create and manage labels") { LabelsView() }
                 }
             }
             Section {
@@ -218,7 +219,7 @@ struct SortingMemoryEditor: View {
             } header: { Text("Sorting guidance") } footer: {
                 Text(memory.isSpam
                     ? "Describe unwanted mail. Promotions and newsletters are legitimate unless your guidance or corrections say otherwise."
-                    : "Describe the mail that belongs in this tag. Your filters still take precedence.")
+                    : "Describe the mail that belongs in this label. Your filters still take precedence.")
             }
             if let error { Section { Text(error).foregroundStyle(.red) } }
             if let notice { Section { Text(notice).foregroundStyle(.secondary) }.accessibilityAddTraits(.updatesFrequently) }
@@ -231,7 +232,7 @@ struct SortingMemoryEditor: View {
             } header: { Text("Correction memory") } footer: {
                 Text(memory.isSpam
                     ? "Spam and Not spam corrections are remembered separately. Clearing examples preserves your guidance."
-                    : "Applying or removing tags teaches future sorting. Clearing examples preserves your guidance.")
+                    : "Applying or removing labels teaches future sorting. Clearing examples preserves your guidance.")
             }
             if !memory.examples.isEmpty {
                 Section(memory.isSpam ? "Recent Spam / Not spam examples" : "Recent examples") {

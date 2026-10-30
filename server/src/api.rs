@@ -61,7 +61,10 @@ pub fn router(state: AppState) -> Router {
         .route("/threads/{id}", get(thread))
         .route("/actions", post(actions))
         .route("/labels", get(labels).post(create_label))
-        .route("/labels/{id}", axum::routing::delete(delete_label))
+        .route(
+            "/labels/{id}",
+            get(label_detail).put(update_label).delete(delete_label),
+        )
         .route("/sorting/memories", get(sorting_memories))
         .route(
             "/sorting/memories/{id}",
@@ -507,7 +510,7 @@ async fn actions(
 
 async fn all_labels(state: &AppState) -> anyhow::Result<Vec<Label>> {
     Ok(
-        sqlx::query_as("SELECT id,name,color,kind FROM labels ORDER BY kind,name")
+        sqlx::query_as("SELECT id,name,color,kind,pinned FROM labels ORDER BY kind,name")
             .fetch_all(&state.pool)
             .await?,
     )
@@ -519,58 +522,149 @@ async fn labels(State(state): State<AppState>) -> ApiResult<Json<Vec<Label>>> {
 struct LabelInput {
     name: String,
     color: String,
+    #[serde(default = "default_pinned")]
+    pinned: bool,
+    guidance: Option<String>,
 }
-async fn create_label(
-    State(state): State<AppState>,
-    Json(input): Json<LabelInput>,
-) -> ApiResult<Json<Label>> {
+fn default_pinned() -> bool {
+    true
+}
+
+fn validate_label(input: &LabelInput) -> ApiResult<()> {
     if input.name.trim().is_empty()
-        || input.name.len() > 50
+        || input.name.trim().len() > 50
+        || input.name.chars().any(char::is_control)
         || !input.color.starts_with('#')
         || input.color.len() != 7
         || !input.color[1..].chars().all(|c| c.is_ascii_hexdigit())
     {
         return Err(ApiError::bad("Enter a label name and hex color"));
     }
+    if input
+        .guidance
+        .as_ref()
+        .is_some_and(|g| g.chars().count() > 2000)
+    {
+        return Err(ApiError::bad(
+            "Sorting guidance must be at most 2000 characters",
+        ));
+    }
+    Ok(())
+}
+
+fn label_write_error(error: sqlx::Error) -> ApiError {
+    if error
+        .as_database_error()
+        .is_some_and(|e| e.is_unique_violation())
+    {
+        ApiError::bad("A label with this name already exists")
+    } else {
+        error.into()
+    }
+}
+
+#[derive(serde::Serialize, sqlx::FromRow)]
+struct LabelDetail {
+    #[serde(flatten)]
+    #[sqlx(flatten)]
+    label: Label,
+    guidance: String,
+    example_count: i64,
+}
+
+async fn label_detail(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<LabelDetail>> {
+    let detail = sqlx::query_as("SELECT l.*,COALESCE(sm.guidance,'') AS guidance,(SELECT COUNT(*) FROM sorting_examples se WHERE se.label_id=l.id) AS example_count FROM labels l LEFT JOIN sorting_memory sm ON sm.label_id=l.id WHERE l.id=? AND l.kind='user'")
+        .bind(id).fetch_optional(&state.pool).await?.ok_or_else(ApiError::not_found)?;
+    Ok(Json(detail))
+}
+
+async fn create_label(
+    State(state): State<AppState>,
+    Json(input): Json<LabelInput>,
+) -> ApiResult<Json<Label>> {
+    validate_label(&input)?;
     let label = Label {
         id: uuid::Uuid::new_v4().to_string(),
         name: input.name.trim().into(),
         color: input.color,
         kind: "user".into(),
+        pinned: input.pinned,
     };
-    let result = sqlx::query("INSERT INTO labels(id,name,color,kind) VALUES(?,?,?,'user')")
+    let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+    sqlx::query("INSERT INTO labels(id,name,color,kind,pinned) VALUES(?,?,?,'user',?)")
         .bind(&label.id)
         .bind(&label.name)
         .bind(&label.color)
-        .execute(&state.pool)
-        .await;
-    if let Err(error) = result {
-        if error
-            .as_database_error()
-            .is_some_and(|e| e.is_unique_violation())
-        {
-            // Names are unique case-insensitively, including system labels such as Inbox.
-            return Err(ApiError::bad("A label with this name already exists"));
-        }
-        return Err(error.into());
+        .bind(label.pinned)
+        .execute(&mut *tx)
+        .await
+        .map_err(label_write_error)?;
+    if let Some(guidance) = input.guidance {
+        sqlx::query("INSERT INTO sorting_memory(label_id,guidance) VALUES(?,?)")
+            .bind(&label.id)
+            .bind(guidance.trim())
+            .execute(&mut *tx)
+            .await?;
     }
+    tx.commit().await?;
+    let _ = state.events.send(());
     Ok(Json(label))
+}
+
+async fn update_label(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(input): Json<LabelInput>,
+) -> ApiResult<Json<Label>> {
+    validate_label(&input)?;
+    let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+    let changed =
+        sqlx::query("UPDATE labels SET name=?,color=?,pinned=? WHERE id=? AND kind='user'")
+            .bind(input.name.trim())
+            .bind(&input.color)
+            .bind(input.pinned)
+            .bind(&id)
+            .execute(&mut *tx)
+            .await
+            .map_err(label_write_error)?;
+    if changed.rows_affected() == 0 {
+        return Err(ApiError::bad("Only your own labels can be edited"));
+    }
+    if let Some(guidance) = input.guidance {
+        sqlx::query("INSERT INTO sorting_memory(label_id,guidance) VALUES(?,?) ON CONFLICT(label_id) DO UPDATE SET guidance=excluded.guidance")
+            .bind(&id).bind(guidance.trim()).execute(&mut *tx).await?;
+    }
+    tx.commit().await?;
+    let _ = state.events.send(());
+    Ok(Json(Label {
+        id,
+        name: input.name.trim().into(),
+        color: input.color,
+        kind: "user".into(),
+        pinned: input.pinned,
+    }))
 }
 async fn delete_label(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
+    let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
     let deleted = sqlx::query("DELETE FROM labels WHERE id=? AND kind='user'")
         .bind(&id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await?;
     if deleted.rows_affected() == 0 {
         return Err(ApiError::bad("Only your own labels can be deleted"));
     }
     sqlx::query("DELETE FROM rules WHERE action='label' AND value=?")
         .bind(&id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
+    let _ = state.events.send(());
     Ok(Json(json!({"ok":true})))
 }
 async fn sorting_memories(State(state): State<AppState>) -> ApiResult<Json<Vec<sorting::Memory>>> {

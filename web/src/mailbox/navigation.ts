@@ -1,9 +1,21 @@
-import { Clock3, Inbox, Mail, Pencil, Send, ShieldAlert, Star, Tag, Trash2 } from 'lucide-react';
+import {
+  Clock3,
+  Inbox,
+  Mail,
+  MailOpen,
+  Pencil,
+  Send,
+  ShieldAlert,
+  Star,
+  Tag,
+  Trash2,
+} from 'lucide-react';
 import type { Label } from '../types';
 
 /** Mailbox views. Each is a system label, except All mail and Drafts. */
 export const mailboxViews = [
   { id: 'INBOX', name: 'Inbox', icon: Inbox },
+  { id: 'UNREAD', name: 'Unread', icon: MailOpen },
   { id: 'STARRED', name: 'Starred', icon: Star },
   { id: 'SNOOZED', name: 'Snoozed', icon: Clock3 },
   { id: 'SENT', name: 'Sent', icon: Send },

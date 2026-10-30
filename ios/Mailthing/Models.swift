@@ -2,7 +2,24 @@ import Foundation
 import UniformTypeIdentifiers
 
 struct Account: Codable { var name: String; var email: String }
-struct MailLabel: Codable, Identifiable { var id: String; var name: String; var color: String; var kind: String }
+struct MailLabel: Codable, Identifiable, Hashable {
+    var id: String; var name: String; var color: String; var kind: String
+    var pinned: Bool? = true
+    var isPinned: Bool { pinned != false }
+}
+struct MailLabelDetail: Decodable {
+    var id: String; var name: String; var color: String; var kind: String
+    var pinned: Bool; var guidance: String; var exampleCount: Int
+}
+struct MailLabelUpdate: Encodable {
+    var name: String; var color: String; var pinned: Bool; var guidance: String
+    var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    var isValid: Bool {
+        !trimmedName.isEmpty && trimmedName.utf8.count <= 50
+            && !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+            && guidance.unicodeScalars.count <= 2000
+    }
+}
 struct MailCount: Codable { var total: Int; var unread: Int }
 struct Settings: Codable {
     var account: Account

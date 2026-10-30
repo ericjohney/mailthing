@@ -30,8 +30,9 @@ pub struct Label {
     pub id: String,
     pub name: String,
     pub color: String,
-    /// `system` labels (INBOX, STARRED, ...) are built in; `user` labels are created in Settings.
+    /// `system` labels (INBOX, STARRED, ...) are built in; `user` labels are owner-managed.
     pub kind: String,
+    pub pinned: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, sqlx::FromRow)]

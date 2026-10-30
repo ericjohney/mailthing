@@ -7,6 +7,9 @@ struct InboxView: View {
     @State private var drawerDrag: CGFloat = 0
     @GestureState private var draggingDrawer = false
     @State private var showSettings = false
+    @State private var showLabels = false
+    @State private var createLabel = false
+    @State private var moreMailboxes = false
     @State private var compose: Draft?
     @State private var tags: TagTarget?
     @State private var showSearch = false
@@ -65,8 +68,15 @@ struct InboxView: View {
             .background(Color.mailCanvas.ignoresSafeArea())
             .navigationDestination(for: String.self) { ConversationView(id: $0) }
             .navigationDestination(isPresented: $showSettings) { SettingsView() }
+            .navigationDestination(isPresented: $showLabels) {
+                LabelsView(onOpen: { id in showLabels = false; selectMailbox(id) })
+            }
+            .sheet(isPresented: $createLabel) { NavigationStack { LabelEditor() } }
             .sheet(item: $tags) { target in TagPicker(threadID: target.id) }
             .sheet(item: $compose, onDismiss: { Task { await store.refresh() } }) { ComposeView(initial: $0) }
+            .onChange(of: store.label) { _, id in
+                if mailboxes.dropFirst(3).contains(where: { $0.0 == id }) { moreMailboxes = true }
+            }
             .task(id: "\(store.label)|\(store.search)") {
                 do {
                     if !store.search.isEmpty { try await Task.sleep(for: .milliseconds(350)) }
@@ -132,7 +142,7 @@ struct InboxView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Open mailboxes")
-            .accessibilityHint("Shows folders and tags")
+            .accessibilityHint("Shows mailboxes and labels")
             textLayout {
                 Text(store.title).font(.title2.weight(.semibold)).lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
@@ -193,7 +203,7 @@ struct InboxView: View {
                 .listRowSeparator(.hidden)
                 .alignmentGuide(.listRowSeparatorLeading) { dimensions in dimensions[.leading] + 12 }
                 .contextMenu {
-                    Button("Tags", systemImage: "tag") { tags = TagTarget(id: thread.id) }
+                    Button("Labels", systemImage: "tag") { tags = TagTarget(id: thread.id) }
                     Button(thread.starred ? "Unstar" : "Star", systemImage: thread.starred ? "star.slash" : "star") {
                         Task { await store.action(thread.id, thread.starred ? "unstar" : "star") }
                     }
@@ -218,7 +228,7 @@ struct InboxView: View {
                         Task { await store.action(thread.id, thread.unread > 0 ? "read" : "unread") }
                     }.tint(.mailSwipeRead)
                         .accessibilityLabel(thread.unread > 0 ? "Mark read" : "Mark unread")
-                    Button("Tags", systemImage: "tag.fill") {
+                    Button("Labels", systemImage: "tag.fill") {
                         tags = TagTarget(id: thread.id)
                     }.tint(.mailSwipeTag)
                 }
@@ -284,8 +294,8 @@ struct InboxView: View {
     private var sidebarView: some View {
         VStack(spacing: 0) {
             MailHeader {
-                MailMark().frame(width: 44, height: 44)
-                Text("Mailthing").font(.headline)
+                MailIconButton(symbol: "xmark", label: "Close mailboxes") { setSidebar(false) }
+                Text("Mailboxes").font(.headline)
                 Spacer()
                 MailIconButton(symbol: "gearshape", label: "Settings") {
                     setSidebar(false)
@@ -293,32 +303,94 @@ struct InboxView: View {
                 }
             }
             List {
-                ForEach(mailboxes, id: \.0) { id, title, icon in
-                    Button { selectMailbox(id) } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: icon).frame(width: 20).foregroundStyle(.secondary)
-                            Text(title).fontWeight(store.label == id ? .semibold : .regular)
-                            Spacer()
-                            if let count = store.settings?.counts[id], count.unread > 0 {
-                                Text("\(count.unread)").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }.padding(.vertical, 3)
-                    }.foregroundStyle(.primary)
-                        .listRowBackground(store.label == id ? Color.mailTint : Color(uiColor: .systemBackground))
-                }
-                if let labels = store.settings?.labels.filter({ $0.kind == "user" }), !labels.isEmpty {
-                    Section("Labels") {
-                        ForEach(labels) { label in
-                            Button { selectMailbox(label.id) } label: { Label(label.name, systemImage: "tag") }
-                                .foregroundStyle(.primary)
-                                .listRowBackground(store.label == label.id ? Color.mailTint : Color(uiColor: .systemBackground))
+                if let account = store.settings?.account {
+                    HStack(spacing: 12) {
+                        MailMark(size: 34)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(account.name).font(.subheadline.weight(.semibold))
+                            Text(account.email).font(.caption).foregroundStyle(.secondary)
                         }
+                    }.padding(.vertical, 10).listRowSeparator(.hidden)
+                }
+                ForEach(Array(mailboxes.prefix(3)), id: \.0) { id, title, icon in
+                    mailboxRow(id, title: title, icon: icon)
+                }
+                Section {
+                    ForEach(store.userLabels.filter(\.isPinned)) { label in
+                        Button { selectMailbox(label.id) } label: {
+                            HStack(spacing: 12) {
+                                LabelDot(hex: label.color).frame(width: 20)
+                                Text(label.name).fontWeight(store.label == label.id ? .semibold : .regular)
+                                Spacer(minLength: 0)
+                                if let count = store.settings?.counts[label.id], count.unread > 0 {
+                                    Text("\(count.unread)").font(.caption).foregroundStyle(.secondary)
+                                }
+                            }.frame(minHeight: 44)
+                        }.foregroundStyle(.primary)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                            .listRowBackground(store.label == label.id ? Color.mailTint : Color(uiColor: .systemBackground))
                     }
+                    if store.userLabels.isEmpty {
+                        Text("Create labels for projects, receipts, and anything you want to find later.")
+                            .font(.caption).foregroundStyle(.secondary).listRowSeparator(.hidden)
+                    } else if !store.userLabels.contains(where: \.isPinned) {
+                        Text("Pin labels to keep them here.").font(.caption).foregroundStyle(.secondary).listRowSeparator(.hidden)
+                    }
+                    Button { setSidebar(false); createLabel = true } label: { Label("New label", systemImage: "plus").frame(minHeight: 44) }
+                        .foregroundStyle(.primary)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    if !store.userLabels.isEmpty {
+                        Button { openLabels() } label: {
+                            HStack {
+                                Label("All labels", systemImage: "tag")
+                                Spacer()
+                                Text("\(store.userLabels.count)").font(.caption).foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                            }.frame(minHeight: 44)
+                        }.foregroundStyle(.primary)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    }
+                } header: {
+                    HStack {
+                        Text("Labels").font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                        Spacer()
+                        Button("Manage") { openLabels() }.font(.caption).frame(minWidth: 54, minHeight: 44)
+                            .accessibilityLabel("Manage labels")
+                    }.textCase(nil)
+                }
+                Section {
+                    DisclosureGroup("More mailboxes", isExpanded: $moreMailboxes) {
+                        ForEach(Array(mailboxes.dropFirst(3)), id: \.0) { id, title, icon in
+                            mailboxRow(id, title: title, icon: icon)
+                        }
+                    }.foregroundStyle(.primary)
                 }
             }
             .listStyle(.plain).contentMargins(.top, 0, for: .scrollContent)
         }
         .background(Color(uiColor: .systemBackground))
+    }
+
+    private func mailboxRow(_ id: String, title: String, icon: String) -> some View {
+        Button { selectMailbox(id) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon).frame(width: 20).foregroundStyle(.secondary)
+                Text(title).fontWeight(store.label == id ? .semibold : .regular)
+                Spacer(minLength: 0)
+                let count = store.settings?.counts[id]
+                if let value = id == "DRAFTS" ? count?.total : count?.unread, value > 0 {
+                    Text("\(value)").font(.caption).foregroundStyle(.secondary)
+                }
+            }.frame(minHeight: 44)
+        }.foregroundStyle(.primary)
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .listRowBackground(store.label == id ? Color.mailTint : Color(uiColor: .systemBackground))
+    }
+
+    private func openLabels() {
+        searching = false
+        setSidebar(false)
+        showLabels = true
     }
 
     private func selectMailbox(_ id: String) {

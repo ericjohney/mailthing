@@ -101,6 +101,21 @@ async fn folder_columns_become_labels() {
         .await
         .unwrap();
     assert_eq!(messages, 6);
+    let visible: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM labels WHERE kind='user' AND pinned=1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        visible, 3,
+        "Existing labels stay in the drawer after upgrading"
+    );
+    let pinned_system: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM labels WHERE kind='system' AND pinned=1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(pinned_system, 0);
     let violations = sqlx::query("PRAGMA foreign_key_check")
         .fetch_all(&pool)
         .await

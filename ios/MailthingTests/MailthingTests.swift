@@ -3,6 +3,30 @@ import WebKit
 @testable import Mailthing
 
 final class MailthingTests: XCTestCase {
+    func testLabelPinsDecodeOlderServersAndPreserveExplicitUnpinning() throws {
+        let old = Data(##"{"id":"work","name":"Work","color":"#777d88","kind":"user"}"##.utf8)
+        XCTAssertTrue(try JSONDecoder.mailthing.decode(MailLabel.self, from: old).isPinned)
+        let current = Data(##"{"id":"work","name":"Work","color":"#777d88","kind":"user","pinned":false}"##.utf8)
+        XCTAssertFalse(try JSONDecoder.mailthing.decode(MailLabel.self, from: current).isPinned)
+    }
+
+    func testLabelEditingUsesServerByteAndScalarLimits() throws {
+        var update = MailLabelUpdate(name: "Projects", color: "#777d88", pinned: false, guidance: "Team discussions")
+        XCTAssertTrue(update.isValid)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.mailthing.encode(update)) as? [String: Any])
+        XCTAssertEqual(payload["pinned"] as? Bool, false)
+        XCTAssertEqual(payload["guidance"] as? String, "Team discussions")
+        update.name = String(repeating: "é", count: 26)
+        XCTAssertFalse(update.isValid, "Label names are limited by UTF-8 bytes")
+        update.name = "  "
+        XCTAssertFalse(update.isValid)
+        update.name = "Work"
+        update.guidance = String(repeating: "🙂", count: 2000)
+        XCTAssertTrue(update.isValid, "Guidance uses Unicode scalars rather than UTF-8 bytes")
+        update.guidance += "x"
+        XCTAssertFalse(update.isValid)
+    }
+
     private let codeNow = Date(timeIntervalSince1970: 1_800_000_000)
     private func codeMail(_ text: String, subject: String = "Sign in", age: Double = 10, sender: String = "security@example.com") -> CodeMail {
         CodeMail(id: "code-message", senderEmail: sender, subject: subject, text: text, receivedAt: codeNow.addingTimeInterval(-age).timeIntervalSince1970 * 1000)

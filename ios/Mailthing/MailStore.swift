@@ -26,6 +26,17 @@ final class MailStore: ObservableObject {
         CodeMailbox.configure(server: api.baseURL)
     }
     var unread: Int { settings?.counts["INBOX"]?.unread ?? 0 }
+    var userLabels: [MailLabel] {
+        (settings?.labels.filter { $0.kind == "user" } ?? []).sorted {
+            if $0.isPinned != $1.isPinned { return $0.isPinned }
+            return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+    }
+    func labelChanged(_ value: MailLabel, deleted: Bool = false) {
+        settings?.labels.removeAll { $0.id == value.id }
+        if !deleted { settings?.labels.append(value) }
+        if deleted && label == value.id { select("INBOX") }
+    }
     var title: String {
         if !search.isEmpty { return "Search results" }
         return settings?.labels.first { $0.id == label }?.name ?? ["ALL": "All mail", "DRAFTS": "Drafts"][label] ?? "Inbox"
