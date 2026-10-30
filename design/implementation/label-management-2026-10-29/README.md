@@ -34,7 +34,18 @@ in native iOS and the responsive web app.
 
 Screenshots use a temporary server/database and fictional mail. Native verification
 used a temporary bundle identifier, leaving the production app and account alone.
-The changes have not been deployed or distributed through TestFlight.
+Released as **TestFlight 1.0.5 build `4100280052601`** from app commit
+`60e46dcfbe52b2a2bb2af533cbb74cdaf98b2576`, using
+[release run 41002800526](https://github.com/ericjohney/mailthing/actions/runs/41002800526).
+Apple processing is `VALID`, the internal build state is `IN_BETA_TESTING`, and
+the internal **Me** group is linked to the build and includes the owner.
+
+The matching server image was deployed through `ericjohney/argocd` commit
+`1ad4affaca2e1901ff76074b58f2d4a9bf8946cf`, pinned to
+`sha256:fdc66a0764e8ce31e8248f757808b4c6294fd1fb50f1b3eaa47743b63b7cbc4c`.
+ArgoCD reports Synced/Healthy with one ready replica. The production health and
+label detail APIs were verified successfully after rollout, including persisted
+pins, sorting guidance, and example counts.
 
 ## Screenshots
 
